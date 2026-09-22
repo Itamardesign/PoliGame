@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {newRun,collect,tick,randomSeed,courseRow,hash} from '../dist/model.js';
+test('fifth pickup gives a combo bonus; majority is reachable',()=>{const r=newRun(1);for(let i=0;i<13;i++)collect(r,'seat');assert.equal(r.seats,60);assert.equal(collect(r,'seat').kind,'formed');assert.equal(r.seats,63);assert.equal(r.formed,true);});
+test('shield absorbs exactly one hit, then penalties reset streak',()=>{const r=newRun(2);collect(r,'seat');collect(r,'shield');collect(r,'shield');assert.equal(collect(r,'hazard').kind,'saved');assert.equal(r.seats,18);assert.equal(r.hits,0);collect(r,'hazard');assert.equal(r.seats,10);assert.equal(r.hits,1);assert.equal(r.combo,0);});
+test('zero seats ends game and later pickups cannot change result',()=>{const r=newRun(3);collect(r,'hazard');collect(r,'hazard');assert.equal(r.seats,0);assert.equal(r.ended,true);collect(r,'seat');assert.equal(r.seats,0);});
+test('timer stops exactly at 61 and majority time is bounded',()=>{const r=newRun(4);r.seats=63;tick(r,60);tick(r,5);assert.equal(r.time,61);assert.equal(r.held,61);assert.equal(r.ended,true);tick(r,2);assert.equal(r.held,61);});
+test('seats cannot exceed parliament size',()=>{const r=newRun(5);for(let i=0;i<100;i++)collect(r,'seat');assert.equal(r.seats,120);assert.equal(r.peak,120);});
+test('daily courses are deterministic and always offer a safe pickup lane',()=>{const a=randomSeed(hash('2026-09-22')),b=randomSeed(hash('2026-09-22'));for(let i=0;i<60;i++){const row=courseRow(a,i);assert.deepEqual(row,courseRow(b,i));assert.ok(row.some(x=>x.type!=='hazard'));assert.equal(new Set(row.map(x=>x.lane)).size,row.length);}});
+test('a clean 61-second course can form a majority even with shields',()=>{const r=newRun(6),rng=randomSeed(6);for(let i=0;i<40;i++)collect(r,courseRow(rng,i)[0].type);assert.ok(r.seats>=61);});

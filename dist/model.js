@@ -1,0 +1,8 @@
+export const DURATION=61;
+export function randomSeed(seed){let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
+export function dayKey(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+export function hash(text){let h=2166136261;for(const c of text)h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;}
+export function newRun(seed){return {seed,seats:15,peak:15,hits:0,shield:false,combo:0,time:0,held:0,formed:false,ended:false};}
+export function collect(state,type){if(state.ended)return {kind:'none'};if(type==='shield'){state.shield=true;return {kind:'shield'};}if(type==='seat'){state.combo++;const amount=state.combo%5===0?6:3;state.seats=Math.min(120,state.seats+amount);state.peak=Math.max(state.peak,state.seats);const formed=!state.formed&&state.seats>=61;if(formed)state.formed=true;return {kind:formed?'formed':'seat',amount,combo:state.combo};}if(state.shield){state.shield=false;return {kind:'saved'};}state.hits++;state.combo=0;state.seats=Math.max(0,state.seats-8);if(state.seats===0)state.ended=true;return {kind:'hit',amount:8};}
+export function tick(state,dt){if(state.ended)return;const step=Math.min(dt,DURATION-state.time);state.time+=step;if(state.seats>=61)state.held+=step;if(state.time>=DURATION)state.ended=true;}
+export function courseRow(rng,index){const safe=Math.floor(rng()*3);const row=[{lane:safe,type:index>0&&index%9===0?'shield':'seat'}];if(index>1){const other=(safe+1+Math.floor(rng()*2))%3;row.push({lane:other,type:'hazard',variant:Math.floor(rng()*3)});}return row;}
