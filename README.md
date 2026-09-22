@@ -8,9 +8,15 @@ Run `npm start`, then open `http://127.0.0.1:4173`. Serve `dist/` on any static 
 
 ## Gameplay
 
-You have 61 seconds and start with 15 seats. Steer the bus with arrow keys, A/D, swipe gestures, or the on-screen buttons. Blue seats add 3; every fifth consecutive pickup adds 6. Red barriers remove 8 and break the streak. Falafel absorbs one collision. Reach 61 and finish with a majority; zero seats ends the run early. The seat count is capped at 120.
+Chaos edition: you have 61 seconds and start with 24 seats. Steer with arrow keys, A/D, swipes or on-screen arrows. Blue seats add 3; every fifth consecutive pickup adds 6. Red barriers remove 12, break the streak and add one scandal. Three scandals end the run regardless of seats. Falafel absorbs one collision.
 
-Daily Chaos uses a deterministic course seeded by the Jerusalem calendar date. Personal best and preferences are device-local. The share button invokes native sharing or copies a challenge URL; it does not send messages automatically. Daily challenge links use the current day's course; old links retain the score target, not the old daily course. Results are casual and not independently verified.
+Gold briefcases offer a deliberate gamble: +9 seats, +1 scandal, and a broken streak. A shield cannot erase the cost. After the first majority, four seats defect after six seconds, then every four seconds, even if the coalition drops below 61. Keep collecting to finish with a majority. Zero seats ends the run early; seats are capped at 120.
+
+Space or the SPIN button clears nearby red barriers across all lanes. It has a 12-second cooldown and is only spent when a barrier is in range. Esc/P pauses. Speed and obstacle density rise across four phases, ending in the no-confidence vote. Every generated row retains one risk-free pickup lane.
+
+Points combine survival time, pickups, best streak, time holding a majority and remaining seats, with a win bonus. The new rules use a separate personal-best key so scores from the easier original version are not mixed in.
+
+Daily Chaos uses a deterministic course seeded by the Jerusalem calendar date and ruleset. Personal best and preferences are device-local. The share button copies a personalized roast, score receipt and challenge URL; it never sends messages automatically. A manual-copy fallback handles clipboard restrictions. Challenge links carry the exact course seed and ruleset, including daily courses, so friends play the same road even on another day. The results compare the friend's score with yours. Replay keeps the same seed for revenge; a separate button rolls a fresh road. Results are casual and not independently verified.
 
 ## Design rationale
 
@@ -22,7 +28,7 @@ Daily Chaos uses a deterministic course seeded by the Jerusalem calendar date. P
 
 ## Validation
 
-`npm test` checks scoring, shields, loss conditions, duration, majority timing, seat caps, course determinism and reachability. `npm run check` checks game script syntax.
+`npm test` checks scoring, shields, three-scandal loss, gold-deal risk, duration, defections, spin cooldown, seat caps, course determinism, seed-link validation and reachability. Simulations cover winning perfect routes and losing stationary strategies. `npm run check` checks game script syntax.
 
 ## Election context
 
