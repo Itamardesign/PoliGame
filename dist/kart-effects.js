@@ -15,7 +15,7 @@ export function makeEffects(scene,track,karts,reduced){
   if(e.type==='near-miss'){burst(p,'#b5f4dd',20);word(p,'כמעט!','#b5f4dd');}
   if(e.type==='bump'||e.type==='ram'){burst(p,e.type==='ram'?'#ffb365':'#fff4b7',22);ring(p,'#ffd090');word(p,e.type==='ram'?'בום!':'טאק!','#ffd696');if(r.player&&!reduced)shake=.18;}
   if(e.type==='pickup'){burst(p,'#ffe67c',9);if(e.count%3===1)word(p,'+1','#fff4a2');}
-  if(e.type==='item-get'){burst(p,'#f7ca6a',20);ring(p,'#ffe797');word(p,'!','#fff8b9');}
+  if(e.type==='item-get'){burst(p,'#f7ca6a',24);ring(p,'#ffe797');word(p,'כוח!','#fff8b9');}
   if(e.type==='item-use'){if(e.item==='shield'){ring(p,'#80ebff');burst(p,'#c0f6ff',18);}if(e.item==='boost'){burst(p,'#61e7ff',24);word(p,'טורבו!','#80efff');}if(e.item==='magnet'){ring(p,'#ed8ad9');word(p,'מגנט מנדטים','#efafff');}}
   if(e.type==='poll-fired'){const mesh=new T.Group(),body=new T.Mesh(new T.BoxGeometry(.75,.55,.16),material('#fff5cc'));mesh.add(body);for(let i=0;i<3;i++){const bar=new T.Mesh(new T.BoxGeometry(.12,.15+i*.1,.04),material('#ed6ea5'));bar.position.set((i-1)*.19,-.1+i*.05,.1);mesh.add(bar);}scene.add(mesh);missiles.push({mesh,start:p.clone(),target:e.target,life:1.05,total:1.05});}
   if(e.type==='hit'){burst(p,'#ff895f',30);ring(p,'#ffb87c');word(p,'ספין!','#ffb888');if(r.player&&!reduced)shake=.28;}

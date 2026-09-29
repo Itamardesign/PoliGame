@@ -2,11 +2,12 @@ import {chromium} from 'file:///C:/Users/ASUS/.cache/codex-runtimes/codex-primar
 import assert from 'node:assert/strict';
 
 const browser=await chromium.launch({headless:true,executablePath:'C:/Users/ASUS/AppData/Local/ms-playwright/chromium-1217/chrome-win64/chrome.exe',args:['--enable-unsafe-swiftshader']});
+const baseUrl=process.env.KART_BASE_URL??'http://127.0.0.1:4173';
 try{
  for(const {width,height} of [{width:320,height:640},{width:390,height:844},{width:844,height:390}]){
   const page=await browser.newPage({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('http://127.0.0.1:4173');await page.waitForFunction(()=>window.readKartState);
+  await page.goto(baseUrl);await page.waitForFunction(()=>window.readKartState);
   await page.locator('#play').tap();await page.waitForFunction(()=>readKartState().state==='running');
   const layout=await page.evaluate(()=>{
    const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
@@ -20,10 +21,12 @@ try{
   assert.deepEqual(errors,[]);await page.close();
  }
  const desktop=await browser.newPage({viewport:{width:1440,height:900}});
- await desktop.goto('http://127.0.0.1:4173');await desktop.waitForFunction(()=>window.readKartState);
+ await desktop.goto(baseUrl);await desktop.waitForFunction(()=>window.readKartState);
  await desktop.locator('#play').click();await desktop.waitForFunction(()=>readKartState().state==='running');
  assert.equal(await desktop.locator('#arena').evaluate(el=>getComputedStyle(el).position),'relative');
  assert.equal(await desktop.locator('#leaderboard').isVisible(),true);
  assert.equal(await desktop.locator('#touch').isVisible(),false);
+ assert.equal(await desktop.locator('.touch-guide').first().isVisible(),false);
+ await desktop.locator('#help').click();assert.match(await desktop.locator('#infoContent').innerText(),/Shift/);
  console.log('PASS full-viewport phone layouts and unchanged desktop HUD');
 }finally{await browser.close();}
