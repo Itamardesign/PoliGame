@@ -17,9 +17,9 @@ export const PARTIES = [
 ];
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export function rng(seed){let n=seed>>>0;return()=>{n+=0x6D2B79F5;let t=Math.imul(n^n>>>15,n|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
-export function makeRace(party=0,difficulty='normal',seed=Date.now(),length=760,routes=[]){
+export function makeRace(party=0,difficulty='normal',seed=Date.now(),length=760,routes=[],levelId='jerusalem'){
  const random=rng(seed);const order=[party,...PARTIES.map((_,i)=>i).filter(i=>i!==party)];
- return {time:0,length,difficulty,random,routes,events:[],eventSeq:0,projectiles:[],done:false,used:0,drifts:0,jumps:0,shortcuts:0,racers:order.map((id,i)=>({id,player:i===0,s:-i*4,speed:0,x:(i%2?1:-1)*3.3,steer:0,lateral:0,routeId:null,routeDistance:0,routeLap:0,routeJumped:false,air:0,airTotal:1,trick:false,hop:0,magnet:0,slipstream:0,slipCooldown:0,boost:0,shield:0,stun:0,charge:0,drifting:false,item:null,coins:0,finish:null,hitCooldown:0,aiClock:3+random()*7,skill:.96+random()*.07}))};
+ return {time:0,length,difficulty,levelId,random,routes,events:[],eventSeq:0,projectiles:[],done:false,used:0,drifts:0,jumps:0,shortcuts:0,racers:order.map((id,i)=>({id,player:i===0,s:-i*4,speed:0,x:(i%2?1:-1)*3.3,steer:0,lateral:0,routeId:null,routeDistance:0,routeLap:0,routeJumped:false,air:0,airTotal:1,trick:false,hop:0,magnet:0,slipstream:0,slipCooldown:0,boost:0,shield:0,stun:0,charge:0,drifting:false,item:null,coins:0,finish:null,hitCooldown:0,aiClock:3+random()*7,skill:.96+random()*.07}))};
 }
 export function ranking(race){return [...race.racers].sort((a,b)=>a.finish!==null&&b.finish!==null?a.finish-b.finish:a.finish!==null?-1:b.finish!==null?1:b.s-a.s);}
 export function grantItem(race,racer){if(racer.item)return;const rank=ranking(race).indexOf(racer);const r=race.random();racer.item=r<.25?'shield':r<.52||rank>=4?'boost':r<.79?'poll':'magnet';emitRace(race,'item-get',racer,{item:racer.item});}
@@ -49,9 +49,9 @@ export function stepRace(race,dt,input={},curve=0){
    if(wasDrifting&&!r.drifting){if(r.charge>.65){r.boost=Math.max(r.boost,r.charge>2.4?3:r.charge>1.6?1.9:1.1);race.drifts++;emitRace(race,'drift-boost',r,{tier:r.charge>2.4?3:r.charge>1.6?2:1});}r.charge=0;}
   }else{
    r.x+=(Math.sin(race.time*.48+r.id*2.1)*6.5-r.x)*dt*1.8;
-   r.aiClock-=dt;if(r.aiClock<=0){grantItem(race,r);useItem(race,r);r.aiClock=7+race.random()*8;}
+   r.aiClock-=dt;if(r.aiClock<=0){grantItem(race,r);useItem(race,r);r.aiClock=(race.difficulty==='insane'?5:7)+race.random()*(race.difficulty==='insane'?5:8);}
   }
-  let target=r.player?32:(race.difficulty==='hard'?36:31.4)*r.skill;
+  let target=r.player?32:({normal:31.4,hard:36,insane:38.5}[race.difficulty]??31.4)*r.skill;
   if(r.player)target+=Math.min(r.coins,10)*.2;
   if(r.player&&input.accelerate&&!input.brake)target+=3;
   if(r.boost>0)target+=13;

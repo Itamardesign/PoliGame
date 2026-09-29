@@ -8,6 +8,13 @@ try{
   const page=await browser.newPage({viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(baseUrl);await page.waitForFunction(()=>window.readKartState);
+  if(width<=650){
+   const home=await page.evaluate(()=>{const play=document.querySelector('#play').getBoundingClientRect(),garage=document.querySelector('.select-garage').getBoundingClientRect(),levels=document.querySelector('.level-picker').getBoundingClientRect(),arena=document.querySelector('#arena').getBoundingClientRect(),drivers=document.querySelector('#drivers');return{playBottom:play.bottom,playTop:play.top,garageTop:garage.top,arenaTop:arena.top,arenaBottom:arena.bottom,innerHeight,levelsBottom:levels.bottom,carousel:drivers.scrollWidth>drivers.clientWidth,playInGarage:document.querySelector('#play').parentElement.classList.contains('select-garage')};});
+   assert.ok(home.playInGarage&&home.playTop>=0&&home.playBottom<=height,`start button outside first screen at ${width}x${height}: ${JSON.stringify(home)}`);
+   assert.ok(home.levelsBottom<home.garageTop,`track picker overlaps garage at ${width}x${height}`);
+   assert.ok(home.carousel,`driver choices should swipe at ${width}x${height}`);
+   await page.screenshot({path:`test-results/kart-home-${width}x${height}.png`});
+  }
   await page.locator('#play').tap();await page.waitForFunction(()=>readKartState().state==='running');
   const layout=await page.evaluate(()=>{
    const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};

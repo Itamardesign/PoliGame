@@ -1,7 +1,7 @@
 import * as T from './vendor/three.module.min.js';
-import {ENCOUNTERS,encounterAt} from './kart-encounters.js';
+import {encountersFor,encounterAt} from './kart-encounters.js';
 export function makeEncounterWorld(scene,track,box,label,mat){
- const objects=ENCOUNTERS.map(e=>{const frame=track.at(e.u*track.length),root=new T.Group();root.position.copy(frame.p);root.rotation.y=Math.atan2(frame.t.x,frame.t.z);scene.add(root);const actor=new T.Group();root.add(actor);
+ const objects=encountersFor(track.id).map(e=>{const frame=track.at(e.u*track.length),root=new T.Group();root.position.copy(frame.p);root.rotation.y=Math.atan2(frame.t.x,frame.t.z);scene.add(root);const actor=new T.Group();root.add(actor);
  if(e.kind==='ball'){
   const ball=new T.Mesh(new T.SphereGeometry(1.8,16,12),mat('#f4a85e'));ball.position.y=1.9;ball.castShadow=true;actor.add(ball);const band=new T.Mesh(new T.TorusGeometry(1.81,.13,6,28),mat('#fff2ba'));ball.add(band);const mark=label('ספין!',2.1,.7,'#fff1be','#633c3e',100);mark.position.set(0,0,-1.82);mark.rotation.y=Math.PI;ball.add(mark);actor.userData.ball=ball;
   for(let i=-4;i<=4;i++){const tile=box(root,1.2,.03,.7,'#e9af63',i*2,.06,0);tile.rotation.y=.25;}

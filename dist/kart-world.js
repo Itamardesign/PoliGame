@@ -1,6 +1,7 @@
 import * as T from './vendor/three.module.min.js';
 import {makeDriver} from './kart-drivers.js';
 import {PARTIES,rng,clamp,ROAD,SECTORS,sectorAt} from './race-model.js';
+import {levelById} from './kart-levels.js';
 const materials=new Map();
 export function mat(c){if(!materials.has(c))materials.set(c,new T.MeshStandardMaterial({color:c,roughness:.67}));return materials.get(c);}
 export function box(g,w,h,d,c,x=0,y=0,z=0){const m=new T.Mesh(new T.BoxGeometry(w,h,d),mat(c));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;g.add(m);return m;}
@@ -117,21 +118,27 @@ export function makeKart(index,logos){
  const name=label(p.short,1.7,.48,'#f4f5dc','#294330',90);name.position.set(0,4.6,0);name.visible=false;g.add(name);g.userData.name=name;
  return g;
 }
-export function makeTrack(){const points=[[0,0,0],[0,1,64],[42,3,110],[97,5,100],[132,2,50],[103,0,10],[127,1,-45],[89,4,-99],[27,2,-107],[-29,0,-80],[-46,0,-34]];const curve=new T.CatmullRomCurve3(points.map(([x,y,z])=>new T.Vector3(x*1.23,y*1.15,z*1.23)),true,'catmullrom',.48);const length=curve.getLength();
+export function makeTrack(levelId='jerusalem'){
+ const base=[[0,0,0],[0,1,64],[42,3,110],[97,5,100],[132,2,50],[103,0,10],[127,1,-45],[89,4,-99],[27,2,-107],[-29,0,-80],[-46,0,-34]];
+ const layouts={
+  jerusalem:base,
+  market:[base[0],...base.slice(1).reverse()].map(([x,y,z],i)=>[x+(i?Math.sin(i*1.8)*3:0),y,z+(i?Math.cos(i*1.6)*3:0)]),
+  midnight:base.map(([x,y,z],i)=>[x*1.06+(i?Math.sin(i*1.4)*2:0),y,z*.96+(i?Math.cos(i*1.3)*2:0)])
+ };const level=levelById(levelId),points=layouts[level.id];const curve=new T.CatmullRomCurve3(points.map(([x,y,z])=>new T.Vector3(x*1.23,y*1.15,z*1.23)),true,'catmullrom',.48);const length=curve.getLength();
  function at(s,offset=0){const u=((s/length)%1+1)%1,p=curve.getPointAt(u),t=curve.getTangentAt(u).normalize(),right=new T.Vector3(-t.z,0,t.x).normalize();p.addScaledVector(right,offset);return{p,t,right};}
  function bend(s){const a=at(s).t,b=at(s+3).t;return Math.atan2(a.z*b.x-a.x*b.z,a.dot(b))/3;}
- return {curve,length,at,bend};}
+ return {id:level.id,sectors:SECTORS.map((sector,i)=>({...sector,name:level.sectors[i]})),curve,length,at,bend};}
 function ribbon(track,offset,width,color,height=0){const pos=[],indices=[],uv=[],N=560;for(let i=0;i<=N;i++){for(const edge of [-1,1]){const p=track.at(i/N*track.length,offset+edge*width/2).p;pos.push(p.x,p.y+height,p.z);uv.push((edge+1)*width/16,i/N*track.length/8);}if(i<N){const n=i*2;indices.push(n,n+1,n+2,n+1,n+3,n+2);}}const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(pos,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.setIndex(indices);geo.computeVertexNormals();const m=new T.Mesh(geo,new T.MeshStandardMaterial({color,roughness:1,side:T.DoubleSide}));m.receiveShadow=true;return m;}
 export function buildWorld(scene,track){
- const rand=rng(6161);box(scene,650,1,600,'#8dae6e',35,-.55,0);
+ const rand=rng(6161);box(scene,650,1,600,track.id==='midnight'?'#53647a':track.id==='market'?'#b69e70':'#8dae6e',35,-.55,0);
  // Broad, textured tarmac with readable edges and gently sloped, grounded shoulders.
  scene.add(ribbon(track,0,26,'#d4c59d',-.1));
- const asphalt=ribbon(track,0,ROAD.halfWidth*2,'#59656b',.035);
+ const asphalt=ribbon(track,0,ROAD.halfWidth*2,track.id==='midnight'?'#43485b':'#59656b',.035);
  const grain=document.createElement('canvas');grain.width=grain.height=128;const ctx=grain.getContext('2d'),noise=ctx.createImageData(128,128);for(let i=0;i<noise.data.length;i+=4){const n=165+Math.floor(rand()*44);noise.data.set([n,n,n,255],i);}ctx.putImageData(noise,0,0);const texture=new T.CanvasTexture(grain);texture.wrapS=texture.wrapT=T.RepeatWrapping;texture.colorSpace=T.SRGBColorSpace;texture.anisotropy=4;asphalt.material.map=texture;scene.add(asphalt);
  for(const side of [-1,1]){
   scene.add(ribbon(track,side*9.25,.17,'#f8f5dc',.07));
   scene.add(ribbon(track,side*10.6,.85,'#e8f5ea',.045));
-  for(let s=0;s<track.length;s+=2.6){const {p,t}=track.at(s,side*10.35);const curb=box(scene,.75,.19,2.5,Math.floor(s/2.6)%2?'#fff5e2':SECTORS[sectorAt(s,track.length)].color,p.x,p.y,p.z);curb.rotation.y=Math.atan2(t.x,t.z);}
+  for(let s=0;s<track.length;s+=2.6){const {p,t}=track.at(s,side*10.35);const curb=box(scene,.75,.19,2.5,Math.floor(s/2.6)%2?'#fff5e2':track.sectors[sectorAt(s,track.length)].color,p.x,p.y,p.z);curb.rotation.y=Math.atan2(t.x,t.z);}
   // Embankment extends to the ground so raised track no longer floats above the grass.
   const vertices=[],idx=[];for(let i=0;i<=280;i++){const inner=track.at(i/280*track.length,side*12.8).p,outer=track.at(i/280*track.length,side*17).p;vertices.push(inner.x,inner.y-.13,inner.z,outer.x,-.05,outer.z);if(i<280){const k=i*2;idx.push(k,k+1,k+2,k+1,k+3,k+2);}}const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(vertices,3));geometry.setIndex(idx);geometry.computeVertexNormals();scene.add(new T.Mesh(geometry,new T.MeshStandardMaterial({color:'#95ac71',side:T.DoubleSide,roughness:1})));
  }
@@ -182,10 +189,10 @@ function addCircuitDetails(scene,track){
  const rand=rng(74161);
  function along(s,x=0){const g=new T.Group(),{p,t}=track.at(s,x);g.position.copy(p);if(Math.abs(x)>=17)g.position.y=0;g.rotation.y=Math.atan2(t.x,t.z);scene.add(g);return g;}
  // Four visual districts, each with a color gate and its own landmark.
- SECTORS.slice(1).forEach((section,i)=>{const g=along(section.start*track.length);for(const x of [-12.1,12.1]){box(g,.65,10.6,.65,'#f8f2df',x,5.3,0);box(g,1.5,.7,1.7,section.color,x,.35,0);box(g,.22,6.7,.15,section.color,x,4.2,-.36);}box(g,24.7,1.05,.6,section.color,0,10.8,0);const text=label(section.name,15,.88,section.color,'#213946',95);text.position.set(0,10.8,-.33);text.rotation.y=Math.PI;g.add(text);for(const x of [-9,9]){const number=label('0'+(i+2),2,.88,section.color,'#213946',110);number.position.set(x,10.8,-.34);number.rotation.y=Math.PI;g.add(number);}});
+ track.sectors.slice(1).forEach((section,i)=>{const g=along(section.start*track.length);for(const x of [-12.1,12.1]){box(g,.65,10.6,.65,'#f8f2df',x,5.3,0);box(g,1.5,.7,1.7,section.color,x,.35,0);box(g,.22,6.7,.15,section.color,x,4.2,-.36);}box(g,24.7,1.05,.6,section.color,0,10.8,0);const text=label(section.name,15,.88,section.color,'#213946',95);text.position.set(0,10.8,-.33);text.rotation.y=Math.PI;g.add(text);for(const x of [-9,9]){const number=label('0'+(i+2),2,.88,section.color,'#213946',110);number.position.set(x,10.8,-.34);number.rotation.y=Math.PI;g.add(number);}});
  // Bank-side chevrons and reflective bollards telegraph the sharp turns early.
  for(let s=18;s<track.length;s+=9){const bend=track.bend(s),side=bend>0?1:-1;
-  for(const edge of [-1,1]){const g=along(s,edge*12.1);box(g,.16,1.1,.16,'#f4edce',0,.55,0);box(g,.18,.22,.18,SECTORS[sectorAt(s,track.length)].color,0,.94,0);}
+  for(const edge of [-1,1]){const g=along(s,edge*12.1);box(g,.16,1.1,.16,'#f4edce',0,.55,0);box(g,.18,.22,.18,track.sectors[sectorAt(s,track.length)].color,0,.94,0);}
   if(Math.abs(bend)>.015&&Math.floor(s/9)%2===0){const g=along(s,side*14.3);box(g,.12,2,.12,'#526d5d',0,1,0);const sign=label(bend>0?'❮❮❮':'❯❯❯',3.6,1.3,'#243c45','#efff9b',110);sign.position.set(0,2.4,0);sign.rotation.y=Math.PI;g.add(sign);}
  }
  // Elevated promenade: guardrails, crossbeams and warm sandstone bridge piers.

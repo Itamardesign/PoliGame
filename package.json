@@ -6,6 +6,6 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check dist/game.js && node --check dist/kart.js && node --check dist/kart-world.js && node --check dist/race-model.js && node --check dist/kart-input.js && node --check dist/kart-drivers.js && node --check dist/kart-routes.js && node --check dist/kart-effects.js && node --check dist/kart-encounters.js && node --check dist/kart-encounter-world.js && node --check dist/kart-sculpt.js && node --check dist/kart-faces.js"
+    "check": "node --check dist/game.js && node --check dist/kart.js && node --check dist/kart-levels.js && node --check dist/kart-world.js && node --check dist/race-model.js && node --check dist/kart-input.js && node --check dist/kart-drivers.js && node --check dist/kart-routes.js && node --check dist/kart-effects.js && node --check dist/kart-encounters.js && node --check dist/kart-encounter-world.js && node --check dist/kart-sculpt.js && node --check dist/kart-faces.js"
   }
 }
