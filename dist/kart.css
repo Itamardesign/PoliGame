@@ -18,3 +18,49 @@
 @media(prefers-reduced-motion:reduce){.lap-progress i{transition:none}}
 @media(max-width:400px){.touch{inset-inline:10px}.touch button{width:46px;height:50px}.touch>div{gap:6px}.touch button[data-key=accelerate]{background:#d9f59ddc}}
 .race-feedback{position:absolute;z-index:6;top:35%;left:50%;transform:translateX(-50%) rotate(-3deg);font-size:clamp(17px,2.2vw,30px);font-weight:900;color:#fff5aa;text-shadow:2px 3px 0 #263c49,-2px -1px 0 #263c49,0 4px 10px #20324455;white-space:nowrap;pointer-events:none;animation:feedback-pop .23s ease-out}.race-feedback.danger{color:#ffb997}.driver-bubble{position:absolute;right:183px;bottom:64px;width:88px;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 4px 6px #263b3240)}.driver-bubble img{width:83px;height:83px;object-fit:cover;border-radius:50%;background:#eef8d5;border:3px solid #fff6db}.driver-bubble b{font-size:11px;border-radius:20px;background:#2d4550;color:#fff6da;padding:2px 12px;margin-top:-9px;z-index:1}.driver-bubble span{font-size:10px;color:#263f44;background:#fff4cf;border-radius:20px;padding:2px 7px;min-height:0}.driver-bubble span:empty{display:none}.arena.hit-flash .vignette{box-shadow:inset 0 0 85px #f5886180}.arena.shielded .driver-bubble img{border-color:#91efff;box-shadow:0 0 22px #8deeff8c}.arena.magnetized .driver-bubble img{border-color:#e9a0ed;box-shadow:0 0 22px #eb9bef8c}.arena.boosting .vignette:after{content:'';position:absolute;inset:0;background:repeating-conic-gradient(from 0deg at 50% 60%,transparent 0deg 15deg,#c8faff18 15.4deg 15.7deg,transparent 16deg 33deg);mask-image:radial-gradient(ellipse,transparent 25%,black 100%);pointer-events:none}.item-slot.ready{animation:item-ready 1.2s ease-in-out infinite}.driver .portrait{transition:transform .25s}.driver:hover .portrait{transform:scale(1.12)}@keyframes feedback-pop{from{transform:translateX(-50%) rotate(-6deg) scale(.7);opacity:0}to{transform:translateX(-50%) rotate(-3deg) scale(1);opacity:1}}@keyframes item-ready{50%{box-shadow:0 0 25px #e8fc8eb8;transform:translateY(-3px)}}@media(max-width:650px){.driver-bubble{right:13px;bottom:205px;width:55px}.driver-bubble img{width:55px;height:55px;border-width:2px}.driver-bubble b{font-size:8px;padding:1px 8px}.driver-bubble span{font-size:8px;white-space:nowrap}.race-feedback{top:44%;font-size:17px}.result-stats b{font-size:14px}.result-stats small{font-size:7px}}@media(prefers-reduced-motion:reduce){.race-feedback,.item-slot.ready{animation:none}}
+
+/* The race occupies the visible phone/tablet viewport; desktop keeps the full dashboard. */
+@media (max-width:650px), (pointer:coarse) and (max-width:1024px){
+ body:has(.arena.racing){overflow:hidden;overscroll-behavior:none}
+ .arena.racing{position:fixed;inset:0;z-index:50;width:100vw;height:100vh;height:100dvh;min-height:0;max-height:none;border:0;border-radius:0}
+ .arena.racing .arena-bottom,.arena.racing .leaderboard,.arena.racing .map-wrap,.arena.racing .sector-badge,.arena.racing .camera-toggle,.arena.racing .driver-bubble{display:none}
+ .arena.racing .position{top:calc(12px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));min-width:78px;padding:6px 9px;border:0;border-radius:12px;background:#f5f9e9e8}
+ .arena.racing .position>small{display:none}
+ .arena.racing .position>b{font-size:32px}
+ .arena.racing .position>b>span{font-size:13px}
+ .arena.racing .position>span{font-size:9px}
+ .arena.racing .race-top{top:calc(12px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));gap:7px}
+ .arena.racing .race-top>div{padding:7px 9px;background:#f5f9e9e8}
+ .arena.racing .race-top small{display:none}
+ .arena.racing .race-top strong{font-size:15px}
+ .arena.racing .race-top button{width:44px;height:44px;border:0;background:#f5f9e9e8;font-size:19px}
+ .arena.racing .speedometer{top:calc(63px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));right:auto;bottom:auto;width:auto;padding:4px 9px;border:0;border-radius:30px;background:#263c31c7;color:#f5f9e9}
+ .arena.racing .speedometer>b,.arena.racing .speedometer>span,.arena.racing .speed-track{display:none}
+ .arena.racing .speedometer>small{display:block;font-size:10px;line-height:1.4}
+ .arena.racing .race-hint{bottom:43%;max-width:75%;font-size:12px;line-height:1.4;white-space:normal;text-align:center;padding:8px 12px}
+ .arena.racing .drift-meter{bottom:calc(143px + env(safe-area-inset-bottom));left:50%;width:136px;min-width:0;padding:7px 10px;opacity:0;transition:opacity .15s}
+ .arena.racing .drift-meter.active{opacity:1}
+ .arena.racing .item-slot{left:auto;right:calc(14px + env(safe-area-inset-right));bottom:calc(143px + env(safe-area-inset-bottom));width:76px;min-height:67px;padding:5px 4px;border-radius:12px;display:none}
+ .arena.racing .item-slot.ready{display:flex;animation:none;box-shadow:0 0 0 2px #dcf48999}
+ .arena.racing .item-slot>span{font-size:29px;line-height:1}
+ .arena.racing .item-slot>b{font-size:9px;line-height:1.1;margin:3px 0 0}
+ .arena.racing .item-slot>small{display:none}
+ .arena.racing .touch{display:flex;position:absolute;left:calc(12px + env(safe-area-inset-left));right:calc(12px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));align-items:flex-end;justify-content:space-between;z-index:4;pointer-events:none;direction:ltr}
+ .arena.racing .touch-steer{display:flex;gap:8px;align-items:flex-end}
+ .arena.racing .touch-actions{display:grid;grid-template-columns:56px 76px;grid-template-rows:46px 58px;gap:8px;align-items:stretch}
+ .arena.racing .touch button{width:100%;height:100%;border:1px solid #fff9;border-radius:15px;background:#233b37d9;color:#f8ffe9;box-shadow:0 4px 12px #102a3040;font-size:24px;touch-action:none;user-select:none;-webkit-user-select:none}
+ .arena.racing .touch-steer button{width:clamp(58px,18vw,74px);height:84px;font-size:31px}
+ .arena.racing .touch-actions .touch-brake{grid-column:1;grid-row:1;font-size:11px;background:#263c31a8}
+ .arena.racing .touch-actions .touch-gas{grid-column:1;grid-row:2;font-size:14px;font-weight:900;background:#dff493;color:#263c31}
+ .arena.racing .touch-actions .touch-drift{grid-column:2;grid-row:1/3;font-size:15px;font-weight:900;background:#f5c589;color:#263c31}
+ .arena.racing .touch button.active{background:#fff8d5;color:#203c35;transform:translateY(2px);box-shadow:0 1px 5px #102a3040}
+ .arena.racing .touch-actions .touch-gas.active{background:#b6ef6b}
+ .arena.racing .touch-actions .touch-drift.active{background:#f5a85d}
+}
+@media (pointer:coarse) and (max-width:1024px) and (max-height:560px){
+ .arena.racing .touch{bottom:calc(8px + env(safe-area-inset-bottom))}
+ .arena.racing .touch-steer button{height:64px;width:62px}
+ .arena.racing .touch-actions{grid-template-columns:48px 68px;grid-template-rows:44px 48px;gap:6px}
+ .arena.racing .item-slot{bottom:calc(106px + env(safe-area-inset-bottom));width:62px;min-height:57px}
+ .arena.racing .drift-meter{bottom:calc(109px + env(safe-area-inset-bottom))}
+}
