@@ -27,7 +27,8 @@ const sample = () =>
             done({
               fps: Math.round(1000 / (times.reduce((a, b) => a + b) / times.length)),
               p95: times[Math.floor(times.length * 0.95)].toFixed(1),
-              calls: readKartState().renderCalls
+              calls: readKartState().renderCalls,
+              scale: readKartState().renderScale
             });
           }
         };
@@ -35,9 +36,10 @@ const sample = () =>
       })
   );
 console.log('home', JSON.stringify(await sample()));
+await page.locator('[data-mode="single"]').click();
 await page.locator('#play').click();
 await page.keyboard.down('KeyW');
-for (let i = 0; i < 6; i++) {
+for (let i = 0; i < 8; i++) {
   await page.waitForTimeout(2500);
   console.log('race', i, JSON.stringify(await sample()));
 }

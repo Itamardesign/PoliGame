@@ -86,7 +86,12 @@ try {
   $('error').classList.remove('hidden');
   throw e;
 }
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
+// Render scale adapts to the device: it drops when frames run long and recovers when there is
+// headroom, between 55% of the native scale and the 1.6x cap.
+const maxScale = Math.min(devicePixelRatio, 1.6),
+  minScale = Math.max(0.6, maxScale * 0.55);
+let renderScale = maxScale;
+renderer.setPixelRatio(renderScale);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = T.PCFSoftShadowMap;
 renderer.outputColorSpace = T.SRGBColorSpace;
@@ -290,21 +295,60 @@ function updateTrails(dt) {
 }
 
 // Pickup meshes follow the same deterministic layout the race simulates, index for index.
-const pickups = [];
-const templates = Object.fromEntries(
-  ['box', 'coin', 'barrier', 'boost', 'ramp'].map(k => [k, makePickup(k)])
-);
+// Pickups follow the same deterministic layout the race simulates, index for index. Each kind
+// is drawn as instances: one draw call per part of the model, however many sit on the track.
 const bend = s => track.bend(s);
-for (const { type, s, x } of layoutPickups(track.length, bend)) {
-  const mesh = templates[type].clone(true),
-    { p, t } = track.at(s, x);
-  mesh.position.copy(p);
-  mesh.rotation.y = Math.atan2(t.x, t.z);
-  scene.add(mesh);
-  pickups.push({ type, s, x, mesh, baseY: p.y });
+const pickups = layoutPickups(track.length, bend).map(({ type, s, x }) => {
+  const { p, t } = track.at(s, x);
+  return { type, s, x, pos: p, yaw: Math.atan2(t.x, t.z), visible: true, spin: 0 };
+});
+const pickupKinds = {};
+for (const type of ['box', 'coin', 'barrier', 'boost', 'ramp']) {
+  const model = makePickup(type),
+    list = pickups.filter(p => p.type === type);
+  model.updateMatrixWorld(true);
+  const parts = [];
+  model.traverse(m => {
+    if (!m.isMesh) return;
+    const mesh = new T.InstancedMesh(m.geometry, m.material, list.length);
+    mesh.castShadow = type === 'box' || type === 'barrier';
+    mesh.receiveShadow = true;
+    mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+    parts.push({ mesh, local: m.matrixWorld.clone() });
+  });
+  pickupKinds[type] = { list, parts, blink: model.userData.blink?.material };
+  list.forEach((p, i) => (p.index = i));
+}
+const pickupMatrix = new T.Matrix4(),
+  partMatrix = new T.Matrix4(),
+  hiddenMatrix = new T.Matrix4().makeScale(0, 0, 0),
+  pickupQuat = new T.Quaternion(),
+  pickupPos = new T.Vector3(),
+  pickupScale = new T.Vector3(1, 1, 1),
+  yAxis = new T.Vector3(0, 1, 0);
+function drawPickups(dt) {
+  for (const [type, kind] of Object.entries(pickupKinds)) {
+    const floats = type === 'box' || type === 'coin';
+    for (const p of kind.list) {
+      if (floats && !reduced) p.spin += dt * (type === 'coin' ? 1.7 : 0.55);
+      pickupPos.copy(p.pos);
+      if (floats && !reduced) pickupPos.y += Math.sin(elapsed * 2.4 + p.s) * 0.17;
+      pickupQuat.setFromAxisAngle(yAxis, p.yaw + p.spin);
+      pickupMatrix.compose(pickupPos, pickupQuat, pickupScale);
+      for (const part of kind.parts)
+        part.mesh.setMatrixAt(
+          p.index,
+          p.visible ? partMatrix.multiplyMatrices(pickupMatrix, part.local) : hiddenMatrix
+        );
+    }
+    for (const part of kind.parts) part.mesh.instanceMatrix.needsUpdate = true;
+    if (kind.blink) kind.blink.emissiveIntensity = Math.sin(elapsed * 8) > 0 ? 1.6 : 0.2;
+  }
 }
 function syncPickups() {
-  race.pickups.forEach((p, i) => (pickups[i].mesh.visible = p.hiddenUntil <= race.time));
+  race.pickups.forEach((p, i) => (pickups[i].visible = p.hiddenUntil <= race.time));
   syncDrops();
 }
 // Filibuster lecterns and protest barricades, kept in step with race.drops.
@@ -463,7 +507,7 @@ function startRace_() {
   introT = 0;
   count = 3.5;
   previousRank = 6;
-  pickups.forEach(p => (p.mesh.visible = true));
+  pickups.forEach(p => (p.visible = true));
   confetti.forEach(p => scene.remove(p.mesh));
   confetti = [];
   for (const id of ['home', 'results', 'pauseScreen', 'talks', 'final']) $(id).classList.add('hidden');
@@ -518,7 +562,7 @@ function goHome() {
     k.userData.shield.visible = false;
     k.userData.flames.forEach(f => (f.visible = false));
   });
-  pickups.forEach(p => (p.mesh.visible = true));
+  pickups.forEach(p => (p.visible = true));
   refreshResumeCard();
   resize();
   $('play').focus({ preventScroll: true });
@@ -882,11 +926,33 @@ function updateHUD() {
   previousRank = position;
 }
 
+let perfTime = 0,
+  perfFrames = 0,
+  perfCalm = 0;
+function adaptQuality(rawDt) {
+  if (document.hidden || state === 'paused' || rawDt > 0.25) return;
+  perfTime += rawDt;
+  perfFrames++;
+  if (perfTime < 1) return;
+  const fps = perfFrames / perfTime;
+  perfTime = perfFrames = 0;
+  let next = renderScale;
+  if (fps < 48) next = Math.max(minScale, renderScale - 0.12);
+  else if (fps > 57 && ++perfCalm >= 3) next = Math.min(maxScale, renderScale + 0.08);
+  if (fps <= 57) perfCalm = 0;
+  if (Math.abs(next - renderScale) > 0.01) {
+    renderScale = next;
+    renderer.setPixelRatio(renderScale);
+    resize();
+  }
+}
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (now - last) / 1000 || 0.016);
+  const rawDt = (now - last) / 1000 || 0.016;
+  const dt = Math.min(0.05, rawDt);
   last = now;
   elapsed += dt;
+  adaptQuality(rawDt);
   if (state === 'countdown') {
     const old = Math.ceil(count);
     count -= dt;
@@ -971,11 +1037,7 @@ function frame(now) {
     setCamera(false, dt);
     scenery.update(elapsed);
     updateHeadlight();
-    for (const p of pickups)
-      if (p.type === 'box' || p.type === 'coin') {
-        p.mesh.position.y = p.baseY + (reduced ? 0 : Math.sin(elapsed * 2.4 + p.s) * 0.17);
-        if (!reduced) p.mesh.rotation.y += dt * (p.type === 'coin' ? 1.7 : 0.55);
-      }
+    drawPickups(dt);
     for (const p of confetti) {
       p.life -= dt;
       p.v.y -= dt * 2;
@@ -1156,6 +1218,7 @@ window.readKartState = () => ({
   wideCamera,
   controls: { ...controls },
   renderCalls: renderer.info.render.calls,
+  renderScale,
   gp: gp ? { round: gp.round, seats: [...gp.seats], coalition: [...gp.coalition], done: gp.done } : null,
   race: race
     ? {
