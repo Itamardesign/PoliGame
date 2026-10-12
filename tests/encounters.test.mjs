@@ -75,6 +75,8 @@ test('turbo ramming stuns an opponent, shield protects and contact cooldown prev
     p = race.racers[0],
     r = race.racers[1];
   p.boost = 2;
+  p.speed = 45;
+  r.speed = 32;
   r.s = p.s;
   r.x = p.x;
   bumpRivals(race);
@@ -89,6 +91,7 @@ test('turbo ramming stuns an opponent, shield protects and contact cooldown prev
   r.stun = 0;
   r.shield = 4;
   r.x = p.x;
+  r.speed = 32;
   bumpRivals(race);
   assert.equal(r.stun, 0);
   assert.equal(r.shield, 0);

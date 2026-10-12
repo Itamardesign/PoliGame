@@ -1,35 +1,17 @@
 import { emitRace, hitRacer, clamp } from './race-model.js';
-export const ENCOUNTERS = [
-  { id: 'ballot', kind: 'ball', u: 0.075 },
-  { id: 'gate', kind: 'gate', u: 0.3 },
-  { id: 'market', kind: 'ball', u: 0.6 },
-  { id: 'prize', kind: 'gate', u: 0.7 },
-  { id: 'final', kind: 'ball', u: 0.89 }
-];
-export function encountersFor(levelId = 'jerusalem') {
-  if (levelId === 'market')
-    return [
-      ...ENCOUNTERS,
-      { id: 'market-entry', kind: 'ball', u: 0.43 },
-      { id: 'market-exit', kind: 'ball', u: 0.78 }
-    ].sort((a, b) => a.u - b.u);
-  if (levelId === 'midnight')
-    return [
-      ...ENCOUNTERS,
-      { id: 'night-1', kind: 'ball', u: 0.18 },
-      { id: 'night-2', kind: 'ball', u: 0.42 },
-      { id: 'night-3', kind: 'ball', u: 0.78 }
-    ].sort((a, b) => a.u - b.u);
-  return ENCOUNTERS;
-}
-export function encounterAt(e, time, lap = 0) {
-  return e.kind === 'ball'
-    ? { x: Math.sin(time * 1.3 + e.u * 19) * 6.8, radius: 1.8 }
-    : { x: ((lap + Math.round(e.u * 10)) % 2 ? 1 : -1) * 5.6, radius: 2.1 };
-}
+import { ENCOUNTERS, encountersFor, encounterAt } from './race-course.js';
+export { ENCOUNTERS, encountersFor, encounterAt };
+// Spin balls and bonus gates apply to every racer. The player's previous position is passed in
+// (the renderer tracks it across shortcut transitions); rivals use the position from their last step.
 export function stepEncounters(race, before, wasRoute) {
-  const p = race.racers[0];
-  if (race.done || p.routeId || wasRoute) return;
+  if (race.done) return;
+  for (const r of race.racers) {
+    if (r.finish !== null || r.routeId) continue;
+    if (r.player ? wasRoute : r.prevS === undefined) continue;
+    crossEncounters(race, r, r.player ? before : r.prevS);
+  }
+}
+function crossEncounters(race, p, before) {
   const lap = Math.floor(Math.max(0, before) / race.length);
   for (const e of encountersFor(race.levelId)) {
     const s = lap * race.length + e.u * race.length;
@@ -44,7 +26,7 @@ export function stepEncounters(race, before, wasRoute) {
       }
     } else if (p.air <= 0) {
       if (dx < at.radius + 0.75) {
-        hitRacer(p, race);
+        hitRacer(p, race, 'ball');
       } else if (dx < at.radius + 2) {
         p.boost = Math.max(p.boost, 1.15);
         emitRace(race, 'near-miss', p);
@@ -64,7 +46,13 @@ export function bumpRivals(race) {
       const dx = a.x - b.x;
       if (Math.abs(a.s - b.s) >= 2.3 || Math.abs(dx) >= 1.85) continue;
       const side = dx !== 0 ? Math.sign(dx) : a.id < b.id ? -1 : 1;
-      const attacker = a.boost > 0 && b.boost <= 0 ? a : b.boost > 0 && a.boost <= 0 ? b : null;
+      // A ram needs a boosting kart closing in hard on one that is not boosting.
+      const attacker =
+        a.boost > 0 && b.boost <= 0 && a.speed - b.speed > 5
+          ? a
+          : b.boost > 0 && a.boost <= 0 && b.speed - a.speed > 5
+            ? b
+            : null;
       const aShare = attacker === a ? 0.2 : attacker === b ? 0.8 : 0.5;
       const separation = Math.min(1.85 - Math.abs(dx), attacker ? 1.25 : 0.9);
       a.x = clamp(a.x + side * separation * aShare, -14.5, 14.5);
@@ -74,7 +62,7 @@ export function bumpRivals(race) {
       contacts.set(key, race.time);
       if (attacker) {
         const victim = attacker === a ? b : a;
-        if (hitRacer(victim, race)) {
+        if (hitRacer(victim, race, 'ram')) {
           emitRace(race, 'ram', attacker, { target: victim.id });
           continue;
         }

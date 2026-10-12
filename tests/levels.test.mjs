@@ -26,7 +26,8 @@ test('the new courses increase pressure through hazards and rival pace', () => {
   for (const level of LEVELS) {
     const race = makeRace(0, level.difficulty, 6161, makeTrack(level.id).length, [], level.id);
     for (let i = 0; i < 240; i++) stepRace(race, 1 / 60, {});
-    distances.push(race.racers[1].s);
+    // Average the whole field: individual rivals now collect, crash and boost.
+    distances.push(race.racers.slice(1).reduce((sum, r) => sum + r.s, 0) / 5);
   }
   assert.ok(distances[0] < distances[1] && distances[1] < distances[2]);
 });

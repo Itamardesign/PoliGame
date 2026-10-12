@@ -1,3 +1,5 @@
+import { makeBrain, aiInput } from './race-ai.js';
+import { layoutPickups, PICKUP_RADIUS, RESPAWN } from './race-course.js';
 export const LAPS = 3;
 export const ROAD = Object.freeze({ halfWidth: 10, driveEdge: 9.7, maxOffset: 14.5 });
 export const SECTORS = [
@@ -106,16 +108,25 @@ export function rng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+// Rival pace per difficulty, added to the shared base speed. Catch-up keeps the pack in reach:
+// rivals far behind get a little extra, rivals far ahead ease off.
+export const PACE = { normal: -1.2, hard: 1.4, insane: 2.6 };
+export const CATCH_UP = { normal: 1, hard: 0.8, insane: 0.6 };
+const BASE_SPEED = 32;
+
 export function makeRace(
   party = 0,
   difficulty = 'normal',
   seed = Date.now(),
   length = 760,
   routes = [],
-  levelId = 'jerusalem'
+  levelId = 'jerusalem',
+  options = {}
 ) {
   const random = rng(seed);
   const order = [party, ...PARTIES.map((_, i) => i).filter(i => i !== party)];
+  const bend = options.bend ?? (() => 0);
   return {
     time: 0,
     length,
@@ -123,6 +134,8 @@ export function makeRace(
     levelId,
     random,
     routes,
+    bend,
+    pickups: options.pickups === false ? [] : layoutPickups(length, bend),
     events: [],
     eventSeq: 0,
     projectiles: [],
@@ -135,6 +148,7 @@ export function makeRace(
       id,
       player: i === 0,
       s: -i * 4,
+      prevS: -i * 4,
       speed: 0,
       x: (i % 2 ? 1 : -1) * 3.3,
       steer: 0,
@@ -155,22 +169,25 @@ export function makeRace(
       stun: 0,
       charge: 0,
       drifting: false,
+      lastDrift: false,
       item: null,
       coins: 0,
       finish: null,
+      projected: null,
       hitCooldown: 0,
-      aiClock: 3 + random() * 7,
-      skill: 0.96 + random() * 0.07
+      skill: 0.985 + random() * 0.03,
+      brain: i === 0 ? null : makeBrain(id, random)
     }))
   };
 }
 export function ranking(race) {
+  const time = r => r.finish ?? r.projected;
   return [...race.racers].sort((a, b) =>
-    a.finish !== null && b.finish !== null
-      ? a.finish - b.finish
-      : a.finish !== null
+    time(a) !== null && time(b) !== null
+      ? time(a) - time(b)
+      : time(a) !== null
         ? -1
-        : b.finish !== null
+        : time(b) !== null
           ? 1
           : b.s - a.s
   );
@@ -183,9 +200,17 @@ export function grantItem(race, racer) {
   emitRace(race, 'item-get', racer, { item: racer.item });
 }
 export function emitRace(race, type, racer, data = {}) {
-  const event = { seq: ++race.eventSeq, type, id: racer.id, s: racer.s, x: racer.x, ...data };
+  const event = {
+    seq: ++race.eventSeq,
+    type,
+    id: racer.id,
+    player: racer.player,
+    s: racer.s,
+    x: racer.x,
+    ...data
+  };
   race.events.push(event);
-  if (race.events.length > 70) race.events.shift();
+  if (race.events.length > 120) race.events.shift();
   return event;
 }
 export function launch(race, racer) {
@@ -215,7 +240,7 @@ export function useItem(race, racer) {
   }
   return item;
 }
-export function hitRacer(racer, race = null) {
+export function hitRacer(racer, race = null, cause = 'hazard') {
   if (racer.hitCooldown > 0) return false;
   racer.hitCooldown = 1.5;
   if (racer.shield > 0) {
@@ -226,40 +251,137 @@ export function hitRacer(racer, race = null) {
   racer.stun = 1.25;
   racer.speed *= 0.5;
   racer.charge = 0;
-  if (race) emitRace(race, 'hit', racer);
+  racer.drifting = false;
+  if (race) emitRace(race, 'hit', racer, { cause });
   return true;
 }
+// Rivals' starts vary: the sharper the field, the more of them nail the launch.
+export function startRace(race, playerLaunch = false) {
+  for (const r of race.racers) {
+    const good = r.player
+      ? playerLaunch
+      : race.random() < { normal: 0.35, hard: 0.55, insane: 0.75 }[race.difficulty] * r.skill;
+    if (good) {
+      r.boost = Math.max(r.boost, 1.9);
+      emitRace(race, 'launch-boost', r);
+    }
+  }
+}
+// Distance-based finish estimate for drivers still on track when the player crosses the line.
+function project(race) {
+  for (const r of race.racers)
+    if (r.finish === null)
+      r.projected = race.time + (race.length * LAPS - r.s) / Math.max(r.speed, BASE_SPEED * 0.85);
+}
+
+function collect(race, r, p) {
+  if (p.type === 'coin') {
+    if (r.coins >= 10 && !r.player) return;
+    p.hiddenUntil = race.time + RESPAWN.coin;
+    r.coins = Math.min(10, r.coins + 1);
+    emitRace(race, 'pickup', r, { count: r.coins });
+  } else if (p.type === 'box') {
+    if (r.item) return;
+    p.hiddenUntil = race.time + RESPAWN.box;
+    grantItem(race, r);
+  } else if (p.type === 'ramp') launch(race, r);
+  else if (p.type === 'boost') {
+    r.boost = Math.max(r.boost, 1.6);
+    emitRace(race, 'boost-pad', r);
+  } else if (p.type === 'barrier') hitRacer(r, race, 'barrier');
+}
+
+export function stepPickups(race, r, before) {
+  if (r.routeId || r.finish !== null) return;
+  const lapBefore = Math.floor(Math.max(0, before) / race.length),
+    lapAfter = Math.floor(Math.max(0, r.s) / race.length);
+  for (const p of race.pickups) {
+    if (p.hiddenUntil > race.time) continue;
+    const radius = p.type === 'coin' && r.magnet > 0 ? 8 : PICKUP_RADIUS[p.type];
+    if (Math.abs(r.x - p.x) > radius) continue;
+    for (let lap = lapBefore; lap <= lapAfter; lap++) {
+      const target = p.s + lap * race.length;
+      if (before <= target && r.s >= target && before !== r.s) {
+        collect(race, r, p);
+        break;
+      }
+    }
+  }
+}
+
+function hitByProjectiles(race, dt) {
+  for (const p of race.projectiles) {
+    p.remaining -= dt;
+    if (p.remaining > 0) continue;
+    const target = race.racers.find(r => r.id === p.to);
+    if (!target || target.finish !== null) continue;
+    if (target.shield > 0) {
+      target.shield = 0;
+      emitRace(race, 'shield-break', target);
+    } else {
+      target.stun = 1.8;
+      target.charge = 0;
+      target.drifting = false;
+      emitRace(race, 'hit', target, { from: p.from, cause: 'poll' });
+    }
+  }
+  race.projectiles = race.projectiles.filter(p => p.remaining > 0);
+}
+
+function routeBendOf(race, r) {
+  const route = r.routeId && race.routes.find(p => p.id === r.routeId);
+  return route?.bend ? route.bend(r.routeDistance) : race.bend(r.s);
+}
+
+// After the player crosses the line the results are frozen, but karts keep rolling for the camera.
+export function coastRace(race, dt) {
+  for (const r of race.racers) {
+    const target = r.finish !== null ? 17 : r.speed;
+    r.speed += (target - r.speed) * -Math.expm1(-dt * 1.2);
+    r.x += (0 - r.x) * -Math.expm1(-dt * 0.8);
+    r.drifting = false;
+    r.steer *= 0.9;
+    r.boost = Math.max(0, r.boost - dt);
+    r.air = Math.max(0, r.air - dt);
+    if (r.routeId) {
+      const route = race.routes.find(p => p.id === r.routeId);
+      r.routeDistance = Math.min(route.length, r.routeDistance + r.speed * dt);
+      if (r.routeDistance >= route.length) {
+        r.routeId = null;
+        r.x = route.exitX;
+      }
+    } else r.s += r.speed * dt;
+  }
+}
+
 export function stepRace(race, dt, input = {}, curve = 0) {
   if (race.done) return;
   dt = clamp(dt, 0, 0.05);
   race.time += dt;
-  for (const p of race.projectiles) {
-    p.remaining -= dt;
-    if (p.remaining <= 0) {
-      const target = race.racers.find(r => r.id === p.to);
-      if (target && target.finish === null) {
-        if (target.shield > 0) {
-          target.shield = 0;
-          emitRace(race, 'shield-break', target);
-        } else {
-          target.stun = 1.8;
-          target.charge = 0;
-          emitRace(race, 'hit', target, { from: p.from });
-        }
-      }
-    }
-  }
-  race.projectiles = race.projectiles.filter(p => p.remaining > 0);
+  hitByProjectiles(race, dt);
+  for (const p of race.pickups) if (p.hiddenUntil > 0 && p.hiddenUntil <= race.time) p.hiddenUntil = -1;
+  const lead = race.racers.find(r => r.player) ?? race.racers[0];
   for (const r of race.racers) {
-    if (r.finish !== null) continue;
+    if (r.finish !== null) {
+      // Finished rivals roll on through the next lap at cruising pace.
+      r.speed += (17 - r.speed) * -Math.expm1(-dt);
+      r.s += r.speed * dt;
+      r.x += (0 - r.x) * -Math.expm1(-dt);
+      r.drifting = false;
+      continue;
+    }
     for (const k of ['boost', 'shield', 'stun', 'hitCooldown', 'magnet', 'hop', 'slipCooldown'])
       r[k] = Math.max(0, r[k] - dt);
+    const bendHere = r.player ? curve : routeBendOf(race, r);
+    const control = r.player ? input : aiInput(race, r, dt, bendHere);
+    if (!r.player && control.useItem) useItem(race, r);
     const wasDrifting = r.drifting,
       before = r.s,
       wasAir = r.air > 0;
+    r.prevS = before;
     if (wasAir) {
       r.air = Math.max(0, r.air - dt);
-      if (r.player && input.drift && !r.lastDrift) {
+      if (control.drift && !r.lastDrift && !r.trick) {
         r.trick = true;
         emitRace(race, 'trick', r);
       }
@@ -268,62 +390,59 @@ export function stepRace(race, dt, input = {}, curve = 0) {
         emitRace(race, 'land', r, { trick: r.trick });
       }
     }
-    if (r.player) {
-      const requested = clamp(input.steer || 0, -1, 1),
-        sensitivity = clamp(input.sensitivity ?? 1, 0.65, 1.35);
-      // Quick turn-in, smooth velocity, and stronger damping on release. No key-repeat dependency.
-      r.steer += (requested - r.steer) * -Math.expm1(-dt * (requested === 0 ? 22 : 13));
-      r.drifting =
-        !!input.drift &&
-        Math.abs(requested) > 0.1 &&
-        r.speed > 15 &&
-        !wasAir &&
-        Math.abs(r.x) < (r.routeId ? 2 : ROAD.driveEdge);
-      const grip = r.drifting ? 8.8 : 11.4;
-      const desired =
-        r.steer * grip * sensitivity * (0.72 + Math.min(r.speed, 45) / 110) +
-        curve * r.speed * (r.drifting ? 1.8 : 3.5);
-      r.lateral += (desired - r.lateral) * -Math.expm1(-dt * (requested === 0 ? 20 : 12));
-      r.x = clamp(r.x + r.lateral * dt, -ROAD.maxOffset, ROAD.maxOffset);
-      if (Math.abs(r.x) >= ROAD.maxOffset) r.lateral = 0;
-      if (r.drifting) {
-        if (!wasDrifting) {
-          r.hop = 0.23;
-          emitRace(race, 'drift-start', r);
-        }
-        const tier = Math.floor(r.charge / 0.8);
-        r.charge = clamp(r.charge + dt, 0, 3);
-        if (Math.floor(r.charge / 0.8) > tier)
-          emitRace(race, 'drift-charge', r, { tier: Math.min(3, Math.floor(r.charge / 0.8)) });
+    const requested = clamp(control.steer || 0, -1, 1),
+      sensitivity = r.player ? clamp(control.sensitivity ?? 1, 0.65, 1.35) : 1;
+    // Quick turn-in, smooth velocity, and stronger damping on release. No key-repeat dependency.
+    r.steer += (requested - r.steer) * -Math.expm1(-dt * (requested === 0 ? 22 : 13));
+    r.drifting =
+      !!control.drift &&
+      Math.abs(requested) > 0.1 &&
+      r.speed > 15 &&
+      !wasAir &&
+      r.stun <= 0 &&
+      Math.abs(r.x) < (r.routeId ? 2 : ROAD.driveEdge);
+    const grip = r.drifting ? 8.8 : 11.4;
+    const desired =
+      r.steer * grip * sensitivity * (0.72 + Math.min(r.speed, 45) / 110) +
+      bendHere * r.speed * (r.drifting ? 1.8 : 3.5);
+    r.lateral += (desired - r.lateral) * -Math.expm1(-dt * (requested === 0 ? 20 : 12));
+    r.x = clamp(r.x + r.lateral * dt, -ROAD.maxOffset, ROAD.maxOffset);
+    if (Math.abs(r.x) >= ROAD.maxOffset) r.lateral = 0;
+    if (r.drifting) {
+      if (!wasDrifting) {
+        r.hop = 0.23;
+        emitRace(race, 'drift-start', r);
       }
-      if (wasDrifting && !r.drifting) {
-        if (r.charge > 0.65) {
-          r.boost = Math.max(r.boost, r.charge > 2.4 ? 3 : r.charge > 1.6 ? 1.9 : 1.1);
-          race.drifts++;
-          emitRace(race, 'drift-boost', r, { tier: r.charge > 2.4 ? 3 : r.charge > 1.6 ? 2 : 1 });
-        }
-        r.charge = 0;
+      const tier = Math.floor(r.charge / 0.8);
+      r.charge = clamp(r.charge + dt, 0, 3);
+      if (Math.floor(r.charge / 0.8) > tier)
+        emitRace(race, 'drift-charge', r, { tier: Math.min(3, Math.floor(r.charge / 0.8)) });
+    }
+    if (wasDrifting && !r.drifting) {
+      if (r.charge > 0.65) {
+        r.boost = Math.max(r.boost, r.charge > 2.4 ? 3 : r.charge > 1.6 ? 1.9 : 1.1);
+        if (r.player) race.drifts++;
+        emitRace(race, 'drift-boost', r, { tier: r.charge > 2.4 ? 3 : r.charge > 1.6 ? 2 : 1 });
       }
-    } else {
-      r.x += (Math.sin(race.time * 0.48 + r.id * 2.1) * 6.5 - r.x) * dt * 1.8;
-      r.aiClock -= dt;
-      if (r.aiClock <= 0) {
-        grantItem(race, r);
-        useItem(race, r);
-        r.aiClock =
-          (race.difficulty === 'insane' ? 5 : 7) + race.random() * (race.difficulty === 'insane' ? 5 : 8);
+      r.charge = 0;
+    }
+
+    let target = BASE_SPEED + Math.min(r.coins, 10) * 0.2;
+    if (control.accelerate && !control.brake) target += 3;
+    if (!r.player) {
+      target += (PACE[race.difficulty] ?? PACE.normal) + (r.skill - 1) * 30;
+      if (lead.player && lead.finish === null) {
+        const gap = r.s - lead.s,
+          k = CATCH_UP[race.difficulty] ?? 1;
+        if (gap < -25) target += Math.min(3.2, ((-gap - 25) / 70) * 3.2) * k;
+        if (gap > 20) target -= Math.min(3, ((gap - 20) / 90) * 3) * k;
       }
     }
-    let target = r.player
-      ? 32
-      : ({ normal: 31.4, hard: 36, insane: 38.5 }[race.difficulty] ?? 31.4) * r.skill;
-    if (r.player) target += Math.min(r.coins, 10) * 0.2;
-    if (r.player && input.accelerate && !input.brake) target += 3;
     if (r.boost > 0) target += 13;
     if (r.stun > 0) target *= 0.4;
     if (Math.abs(r.x) > (r.routeId ? 2.1 : ROAD.driveEdge)) target *= r.routeId ? 0.65 : 0.48;
-    if (r.player && input.brake) target *= 0.48;
-    r.speed += (target - r.speed) * -Math.expm1(-dt * (r.player && input.brake ? 6 : 2.3));
+    if (control.brake) target *= 0.48;
+    r.speed += (target - r.speed) * -Math.expm1(-dt * (control.brake ? 6 : 2.3));
     const distance = r.speed * dt;
     if (r.routeId) {
       const route = race.routes.find(p => p.id === r.routeId);
@@ -343,26 +462,27 @@ export function stepRace(race, dt, input = {}, curve = 0) {
       }
     } else {
       r.s += distance;
-      if (r.player) {
-        const lap = Math.floor(Math.max(0, before) / race.length);
-        for (const route of race.routes) {
-          const gate = lap * race.length + route.start;
-          if (before < gate && r.s >= gate && Math.abs(r.x - route.entryX) < 2.1 && r.speed > 22) {
-            r.routeId = route.id;
-            r.routeDistance = 0;
-            r.routeLap = lap;
-            r.routeJumped = false;
-            r.s = gate;
-            r.x = 0;
-            r.lateral = 0;
-            race.shortcuts++;
-            emitRace(race, 'shortcut-enter', r, { route: route.id });
-            break;
-          }
+      const lap = Math.floor(Math.max(0, before) / race.length);
+      for (const route of race.routes) {
+        const gate = lap * race.length + route.start;
+        if (before < gate && r.s >= gate && Math.abs(r.x - route.entryX) < 2.1 && r.speed > 22) {
+          r.routeId = route.id;
+          r.routeDistance = 0;
+          r.routeLap = lap;
+          r.routeJumped = false;
+          r.s = gate;
+          r.x = 0;
+          r.lateral = 0;
+          r.drifting = false;
+          r.charge = 0;
+          if (r.player) race.shortcuts++;
+          emitRace(race, 'shortcut-enter', r, { route: route.id });
+          break;
         }
       }
+      stepPickups(race, r, before);
     }
-    if (r.player && !r.routeId) {
+    if (!r.routeId) {
       const drafting = race.racers.some(
         other =>
           other !== r &&
@@ -379,11 +499,18 @@ export function stepRace(race, dt, input = {}, curve = 0) {
         emitRace(race, 'slipstream', r);
       }
     }
-    r.lastDrift = !!input.drift;
+    r.lastDrift = !!control.drift;
     if (r.s >= race.length * LAPS) {
       r.finish = race.time;
+      r.projected = r.finish;
       r.s = race.length * LAPS;
+      emitRace(race, 'finish', r, { place: race.racers.filter(o => o.finish !== null).length });
     }
   }
-  if (race.racers[0].finish !== null) race.done = true;
+  const player = race.racers.find(r => r.player) ?? race.racers[0];
+  if (player.finish !== null) {
+    player.s = race.length * LAPS;
+    race.done = true;
+    project(race);
+  }
 }

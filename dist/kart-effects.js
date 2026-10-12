@@ -99,29 +99,31 @@ export function makeEffects(scene, track, karts, reduced) {
     const r = race.racers.find(r => r.id === e.id);
     if (!r) return;
     const p = effectPoint(r);
+    // Rivals get particles but only speak up for the big moments, so the screen stays readable.
+    const say = r.player || ['hit', 'ram', 'shield-break'].includes(e.type) ? word : () => {};
     if (e.type === 'jackpot') {
       burst(p, '#ffe276', 36);
       ring(p, '#ffe276');
-      word(p, 'בונוס! +3', '#fff0a1');
+      say(p, 'בונוס! +3', '#fff0a1');
     }
     if (e.type === 'near-miss') {
       burst(p, '#b5f4dd', 20);
-      word(p, 'כמעט!', '#b5f4dd');
+      say(p, 'כמעט!', '#b5f4dd');
     }
     if (e.type === 'bump' || e.type === 'ram') {
       burst(p, e.type === 'ram' ? '#ffb365' : '#fff4b7', 22);
       ring(p, '#ffd090');
-      word(p, e.type === 'ram' ? 'בום!' : 'טאק!', '#ffd696');
+      say(p, e.type === 'ram' ? 'בום!' : 'טאק!', '#ffd696');
       if (r.player && !reduced) shake = 0.18;
     }
     if (e.type === 'pickup') {
       burst(p, '#ffe67c', 9);
-      if (e.count % 3 === 1) word(p, '+1', '#fff4a2');
+      if (e.count % 3 === 1) say(p, '+1', '#fff4a2');
     }
     if (e.type === 'item-get') {
       burst(p, '#f7ca6a', 24);
       ring(p, '#ffe797');
-      word(p, 'כוח!', '#fff8b9');
+      say(p, 'כוח!', '#fff8b9');
     }
     if (e.type === 'item-use') {
       if (e.item === 'shield') {
@@ -130,11 +132,11 @@ export function makeEffects(scene, track, karts, reduced) {
       }
       if (e.item === 'boost') {
         burst(p, '#61e7ff', 24);
-        word(p, 'טורבו!', '#80efff');
+        say(p, 'טורבו!', '#80efff');
       }
       if (e.item === 'magnet') {
         ring(p, '#ed8ad9');
-        word(p, 'מגנט מנדטים', '#efafff');
+        say(p, 'מגנט מנדטים', '#efafff');
       }
     }
     if (e.type === 'poll-fired') {
@@ -152,13 +154,13 @@ export function makeEffects(scene, track, karts, reduced) {
     if (e.type === 'hit') {
       burst(p, '#ff895f', 30);
       ring(p, '#ffb87c');
-      word(p, 'ספין!', '#ffb888');
+      say(p, 'ספין!', '#ffb888');
       if (r.player && !reduced) shake = 0.28;
     }
     if (e.type === 'shield-break') {
       burst(p, '#8deeff', 35);
       ring(p, '#99f3ff');
-      word(p, 'נחסם!', '#b9f8ff');
+      say(p, 'נחסם!', '#b9f8ff');
     }
     if (e.type === 'drift-charge') {
       burst(p, e.tier === 3 ? '#ee99ff' : e.tier === 2 ? '#ffb74f' : '#71dfff', 10);
@@ -167,32 +169,32 @@ export function makeEffects(scene, track, karts, reduced) {
       const color = e.tier === 3 ? '#ef91ff' : e.tier === 2 ? '#ffc16f' : '#7bedff';
       burst(p, color, 28);
       ring(p, color);
-      word(p, e.tier === 3 ? 'אולטרה טורבו!' : e.tier === 2 ? 'סופר טורבו!' : 'מיני טורבו!', color);
+      say(p, e.tier === 3 ? 'אולטרה טורבו!' : e.tier === 2 ? 'סופר טורבו!' : 'מיני טורבו!', color);
     }
     if (e.type === 'slipstream') {
       burst(p, '#c9f898', 24);
-      word(p, 'עקיפה חכמה!', '#d1ff9d');
+      say(p, 'עקיפה חכמה!', '#d1ff9d');
     }
     if (e.type === 'jump') {
       ring(p, '#e4b7ff');
       burst(p, '#e4b7ff', 14);
     }
-    if (e.type === 'trick') word(p, 'סטייל!', '#efb4ff');
+    if (e.type === 'trick') say(p, 'סטייל!', '#efb4ff');
     if (e.type === 'land') {
       ring(p, e.trick ? '#e2a5ff' : '#fff0ce');
       burst(p, e.trick ? '#c49bff' : '#d8cbac', e.trick ? 25 : 8);
-      if (e.trick) word(p, 'נחיתה מושלמת!', '#dfadff');
+      if (e.trick) say(p, 'נחיתה מושלמת!', '#dfadff');
     }
     if (e.type === 'shortcut-enter') {
       burst(p, '#ef9ad6', 25);
-      word(p, 'דרך סודית!', '#efb7ff');
+      say(p, 'דרך סודית!', '#efb7ff');
     }
     if (e.type === 'shortcut-exit') {
       ring(p, '#e9a7ed');
     }
     if (e.type === 'launch-boost') {
       burst(p, '#99edff', 28);
-      word(p, 'זינוק מושלם!', '#aaf3ff');
+      say(p, 'זינוק מושלם!', '#aaf3ff');
     }
   }
   function update(dt, race) {

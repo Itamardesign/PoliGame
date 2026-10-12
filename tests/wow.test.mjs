@@ -82,7 +82,7 @@ test('slipstream requires following a nearby opponent and has a cooldown', () =>
   }
   assert.ok(p.boost > 0);
   assert.ok(p.slipCooldown > 0);
-  assert.equal(r.events.filter(e => e.type === 'slipstream').length, 1);
+  assert.equal(r.events.filter(e => e.type === 'slipstream' && e.player).length, 1);
 });
 test('magnet expires and emits visible feedback events', () => {
   const r = race(),
@@ -107,6 +107,6 @@ test('hit feedback distinguishes shield absorption from a spin', () => {
 test('feedback history is bounded during long races', () => {
   const r = race();
   for (let i = 0; i < 500; i++) emitRace(r, 'pickup', r.racers[0]);
-  assert.equal(r.events.length, 70);
+  assert.equal(r.events.length, 120);
   assert.equal(r.events.at(-1).seq, 500);
 });

@@ -60,7 +60,8 @@ test('shield absorbs one hazard; collision cooldown prevents repeated hits', () 
   assert.ok(p.stun > 0);
 });
 test('poll travels before impact and a shield can block it', () => {
-  const r = makeRace(),
+  // Rivals here hold no pickups, so the projectile mechanics are tested in isolation.
+  const r = makeRace(0, 'normal', 6161, 760, [], 'jerusalem', { pickups: false }),
     p = r.racers[0],
     a = r.racers[1],
     b = r.racers[2];

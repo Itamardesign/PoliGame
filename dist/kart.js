@@ -13,8 +13,10 @@ import {
   hitRacer,
   clamp,
   emitRace,
-  launch
+  startRace,
+  coastRace
 } from './race-model.js';
+import { layoutPickups } from './race-course.js';
 import {
   makeKart,
   loadLogos,
@@ -305,20 +307,16 @@ const pickups = [];
 const templates = Object.fromEntries(
   ['box', 'coin', 'barrier', 'boost', 'ramp'].map(k => [k, makePickup(k)])
 );
-function addPickup(type, s, x) {
+// Meshes follow the same deterministic layout the race simulates, index for index.
+const bend = s => track.bend(s);
+for (const { type, s, x } of layoutPickups(track.length, bend)) {
   const mesh = templates[type].clone(true),
     { p, t } = track.at(s, x);
   mesh.position.copy(p);
   mesh.rotation.y = Math.atan2(t.x, t.z);
   scene.add(mesh);
-  pickups.push({ type, s, x, mesh, lastLap: -1, baseY: p.y });
+  pickups.push({ type, s, x, mesh, baseY: p.y });
 }
-for (let s = 35; s < track.length; s += 67) for (const x of [-6.5, 0, 6.5]) addPickup('box', s, x);
-for (let s = 19; s < track.length; s += 28)
-  for (let j = 0; j < 3; j++) addPickup('coin', s + j * 3.5, Math.sin(s * 0.06) * 6.2);
-for (let s = 68; s < track.length; s += 57) addPickup('barrier', s, Math.sin(s * 0.2) * 6.2);
-for (let s = 95; s < track.length; s += 150) addPickup('boost', s, Math.sign(track.bend(s) || 1) * -7.3);
-for (const u of [0.33, 0.73]) addPickup('ramp', track.length * u, 0);
 function clearControls() {
   heldKeys.clear();
   touchKeys.clear();
@@ -371,14 +369,11 @@ function start() {
   fx.reset();
   seenEvent = 0;
   launchPressed = 99;
-  race = makeRace(selected, level.difficulty, Date.now(), track.length, track.shortcuts, level.id);
+  race = makeRace(selected, level.difficulty, Date.now(), track.length, track.shortcuts, level.id, { bend });
   state = 'countdown';
   count = 3.5;
   previousRank = 6;
-  pickups.forEach(p => {
-    p.lastLap = -1;
-    p.mesh.visible = true;
-  });
+  pickups.forEach(p => (p.mesh.visible = true));
   confetti.forEach(p => scene.remove(p.mesh));
   confetti = [];
   for (const id of ['home', 'results', 'pauseScreen']) $(id).classList.add('hidden');
@@ -447,7 +442,8 @@ function consumeEvents() {
   for (const e of race.events) {
     if (e.seq <= seenEvent) continue;
     seenEvent = e.seq;
-    fx.event(e, race);
+    // Effects for rivals only play when they happen near the player's kart.
+    if (e.player || Math.abs(e.s - race.racers[0].s) < 90) fx.event(e, race);
     const me = e.id === selected;
     if (e.type === 'poll-fired' && e.target === selected) {
       feedback('סקר בדרך אליכם! הפעילו חסינות', 'danger');
@@ -471,6 +467,17 @@ function consumeEvents() {
       feedback(messages[e.type]);
       tone(750, 0.18);
     }
+    if (e.type === 'pickup') tone(900, 0.055);
+    if (e.type === 'boost-pad') tone(840, 0.2);
+    if (e.type === 'item-get') {
+      toast(
+        (compactTouchLayout() ? 'כוח מוכן: ' : '') +
+          itemNames[e.item][1] +
+          (compactTouchLayout() ? ' · געו במסלול להפעלה' : ' · לחצו רווח')
+      );
+      if (compactTouchLayout()) navigator.vibrate?.(45);
+      tone(570, 0.12);
+    }
     if (e.type === 'item-use') {
       const msg = {
         boost: 'טורבו הבטחות!',
@@ -482,7 +489,7 @@ function consumeEvents() {
       tone(e.item === 'boost' ? 880 : 550, 0.22);
     }
     if (e.type === 'hit') {
-      feedback('ספין! חוזרים לעניינים…', 'danger');
+      feedback(e.cause === 'barrier' ? 'נתקעתם במחסום. זה יעבור…' : 'ספין! חוזרים לעניינים…', 'danger');
       tone(130, 0.24, 'sawtooth');
     }
     if (e.type === 'drift-charge') {
@@ -509,7 +516,7 @@ function updateKarts(dt) {
     kart.position.y += jump + (r.hop > 0 ? Math.sin((r.hop / 0.23) * Math.PI) * 0.3 : 0);
     kart.position.y += reduced ? 0 : Math.sin(elapsed * 17 + r.id) * 0.018;
     kart.rotation.x = Math.atan2(-t.y, Math.hypot(t.x, t.z));
-    const steer = r.player ? r.steer : 0;
+    const steer = r.steer;
     kart.rotation.set(
       Math.atan2(-t.y, Math.hypot(t.x, t.z)),
       Math.atan2(t.x, t.z) + (r.drifting ? -steer * 0.38 : -steer * 0.16),
@@ -518,7 +525,7 @@ function updateKarts(dt) {
     if (r.stun > 0 && !reduced) kart.rotation.y += Math.sin((1 - r.stun / 1.8) * Math.PI * 3) * 0.95;
     if (r.trick && r.air > 0 && !reduced) kart.rotation.y += (1 - r.air / r.airTotal) * Math.PI * 2;
     kart.userData.head.rotation.z = reduced ? 0 : Math.sin(elapsed * 4 + r.id) * 0.03 - r.steer * 0.045;
-    kart.userData.head.rotation.y = r.player ? -r.steer * 0.15 : Math.sin(elapsed * 0.8 + r.id) * 0.1;
+    kart.userData.head.rotation.y = -r.steer * 0.15 + (r.player ? 0 : Math.sin(elapsed * 0.8 + r.id) * 0.06);
     for (const eye of kart.userData.eyes) eye.scale.y = (elapsed + r.id * 0.7) % 4.7 < 0.13 ? 0.12 : 1;
     kart.scale.setScalar(1);
     kart.userData.wheels.forEach(w => (w.rotation.x += r.speed * dt * 1.5));
@@ -725,67 +732,9 @@ function updateHUD() {
   }
   previousRank = position;
 }
-function pickupStep(before, wasRoute = false) {
-  const player = race.racers[0],
-    lap = Math.floor(Math.max(0, player.s) / track.length);
-  if (wasRoute || player.routeId) return;
-  for (const p of pickups) {
-    const prevLap = Math.floor(Math.max(0, before) / track.length);
-    if (p.lastLap < lap) p.mesh.visible = true;
-    for (const l of new Set([prevLap, lap])) {
-      const target = p.s + l * track.length;
-      if (
-        p.lastLap === l ||
-        before > target ||
-        player.s < target ||
-        Math.abs(player.x - p.x) >
-          (p.type === 'coin' && player.magnet > 0
-            ? 8
-            : p.type === 'ramp'
-              ? 2.5
-              : p.type === 'boost'
-                ? 1.8
-                : p.type === 'barrier'
-                  ? 1.45
-                  : 1.6)
-      )
-        continue;
-      p.lastLap = l;
-      if (p.type === 'coin') {
-        p.mesh.visible = false;
-        player.coins = Math.min(10, player.coins + 1);
-        emitRace(race, 'pickup', player, { count: player.coins });
-        tone(900, 0.055);
-      }
-      if (p.type === 'box' && !player.item) {
-        p.mesh.visible = false;
-        grantItem(race, player);
-        toast(
-          (compactTouchLayout() ? 'כוח מוכן: ' : '') +
-            itemNames[player.item][1] +
-            (compactTouchLayout() ? ' · געו במסלול להפעלה' : ' · לחצו רווח')
-        );
-        if (compactTouchLayout()) navigator.vibrate?.(45);
-        tone(570, 0.12);
-      }
-      if (p.type === 'ramp') {
-        launch(race, player);
-      }
-      if (p.type === 'boost') {
-        emitRace(race, 'item-use', player, { item: 'boost' });
-        player.boost = Math.max(player.boost, 1.6);
-        tone(840, 0.2);
-      }
-      if (p.type === 'barrier') {
-        if (hitRacer(player, race)) {
-          toast('נתקעתם בספין. זה יעבור…');
-          tone(130, 0.2, 'sawtooth');
-        }
-      }
-    }
-  }
-  // Rival collisions are physical, with a cooldown so contact cannot trap the player.
-  bumpRivals(race);
+// The race owns pickups; meshes only mirror whether each one is currently collectable.
+function syncPickups() {
+  race.pickups.forEach((p, i) => (pickups[i].mesh.visible = p.hiddenUntil <= race.time));
 }
 function finish() {
   state = 'results';
@@ -817,7 +766,7 @@ function finish() {
   $('resultsBoard').innerHTML = order
     .map((r, i) => {
       const party = PARTIES[r.id];
-      return `<li class="results-row ${r.player ? 'me' : ''} ${i === 0 ? 'winner' : ''}" style="--party-color:${party.color}"><span class="results-rank">${i + 1}</span><img class="results-face" src="${portraits[r.id]}" alt=""><span class="results-driver"><b>${party.leader}${r.player ? '<em>אתם</em>' : ''}</b><small>${party.name}</small></span><span class="results-time">${r.finish !== null ? formatTime(r.finish) : 'במסלול'}</span></li>`;
+      return `<li class="results-row ${r.player ? 'me' : ''} ${i === 0 ? 'winner' : ''}" style="--party-color:${party.color}"><span class="results-rank">${i + 1}</span><img class="results-face" src="${portraits[r.id]}" alt=""><span class="results-driver"><b>${party.leader}${r.player ? '<em>אתם</em>' : ''}</b><small>${party.name}</small></span><span class="results-time">${i === 0 ? formatTime(r.finish ?? r.projected) : '+' + ((r.finish ?? r.projected) - (order[0].finish ?? order[0].projected)).toFixed(2)}</span></li>`;
     })
     .join('');
   $('resultsBoard').scrollTop = 0;
@@ -860,10 +809,7 @@ function frame(now) {
       state = 'running';
       arena.classList.remove('launch-window');
       $('raceHint').textContent = 'W / ↑ גז · A D / ← → היגוי · SHIFT דריפט / תרגיל באוויר · רווח אביזר';
-      if (launchPressed >= 0.45 && launchPressed <= 1.15) {
-        race.racers[0].boost = 1.9;
-        emitRace(race, 'launch-boost', race.racers[0]);
-      }
+      startRace(race, launchPressed >= 0.45 && launchPressed <= 1.15);
       $('countdown').classList.add('hidden');
     }
   }
@@ -885,8 +831,10 @@ function frame(now) {
       },
       routeBend(track, p)
     );
-    pickupStep(before, wasRoute);
     stepEncounters(race, before, wasRoute);
+    // Rival collisions are physical, with a cooldown so contact cannot trap the player.
+    bumpRivals(race);
+    syncPickups();
     consumeEvents();
     if (race.drifts > drifts) {
       tone(980, 0.2);
@@ -899,6 +847,7 @@ function frame(now) {
     if (race.time > 7) $('raceHint').classList.add('hidden');
     if (race.done) finish();
   }
+  if (state === 'results' && race) coastRace(race, dt);
   if (state !== 'home' && state !== 'paused') updateKarts(dt);
   updateEngine();
   if (state !== 'paused') {
