@@ -25,6 +25,7 @@ await page.waitForFunction(() => window.readKartState && !document.querySelector
 });
 const tag = `${level}-${w}x${h}`;
 if (shots.includes(0)) await page.screenshot({ path: `${out}/${tag}-home.png` });
+await page.locator('[data-mode="single"]').click();
 await page.locator('#play').click();
 await page.waitForFunction(() => readKartState().state === 'running', null, { timeout: 20000 });
 await page.keyboard.down('KeyW');

@@ -18,8 +18,8 @@ const page = await browser.newPage({
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => m.type() === 'error' && errors.push(m.text()));
-const tag = `${w}x${h}${touch ? '-touch' : ''}`;
-await page.goto('http://127.0.0.1:4173/?qa=1');
+const tag = `${process.argv[4] ?? ''}${w}x${h}${touch ? '-touch' : ''}`;
+await page.goto('http://127.0.0.1:4173/?qa=1' + (process.argv[4] ? '&level=' + process.argv[4] : ''));
 await page.waitForFunction(() => window.__ck && !document.querySelector('#play').disabled, null, {
   timeout: 60000
 });

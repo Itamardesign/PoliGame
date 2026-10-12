@@ -32,6 +32,7 @@ import { makeTrails } from './kart-trails.js';
 import { KEY_ACTIONS, readControls } from './kart-input.js';
 import { levelById } from './kart-levels.js';
 import { makeHud, formatTime } from './kart-hud.js';
+import { MOODS } from './world-set.js';
 import * as GP from './gp.js';
 import {
   renderDrivers,
@@ -90,37 +91,29 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = T.PCFSoftShadowMap;
 renderer.outputColorSpace = T.SRGBColorSpace;
 renderer.toneMapping = T.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+// Each course has a mood (day, dusk, night) that sets the sky, light and fog.
+const mood = MOODS[level.mood ?? 'day'];
+renderer.toneMappingExposure = mood.exposure;
 const scene = new T.Scene();
-scene.background = new T.Color(level.sky);
-scene.fog = new T.Fog(level.fog, 115, 340);
-scene.add(
-  new T.HemisphereLight(
-    level.id === 'midnight' ? '#b9cfff' : '#fff9df',
-    level.id === 'midnight' ? '#455675' : '#5b7e6f',
-    level.id === 'midnight' ? 1.65 : 2.0
-  )
-);
-const sun = new T.DirectionalLight(
-  level.id === 'midnight' ? '#b9bfff' : level.id === 'market' ? '#ffe1ad' : '#fff1d4',
-  level.id === 'midnight' ? 2.35 : 3.1
-);
-sun.position.set(-25, 60, -30);
+scene.background = new T.Color(mood.horizon);
+scene.fog = new T.Fog(mood.horizon, 150, 430);
+scene.add(new T.HemisphereLight(mood.hemi[0], mood.hemi[1], mood.hemi[2]));
+const sun = new T.DirectionalLight(mood.key[0], mood.key[1]);
+const sunOffset = new T.Vector3(...mood.sunDir).normalize().multiplyScalar(80);
+sun.position.copy(sunOffset);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 160 });
+Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 180 });
 sun.shadow.normalBias = 0.06;
 scene.add(sun, sun.target);
-const camera = new T.PerspectiveCamera(46, 1, 0.1, 420),
+const camera = new T.PerspectiveCamera(46, 1, 0.1, 800),
   track = makeTrack(level.id);
 track.shortcuts = level.id === 'jerusalem' ? makeShortcuts(track) : [];
+const logos = await loadLogos();
 const world = new T.Group();
 scene.add(world);
-buildWorld(world, track);
+const scenery = buildWorld(world, track, { mood: level.mood ?? 'day', logos, level });
 buildShortcuts(world, track, box, label, mat);
-const gantryMeshes = new Set();
-world.userData.gantry.traverse(m => gantryMeshes.add(m));
-batchStatic(world, gantryMeshes);
 
 let selected = clamp(Number(stored('ck-driver', '0')) || 0, 0, PARTIES.length - 1),
   state = 'home',
@@ -225,12 +218,23 @@ function prepareKart(g) {
   batchStatic(g.userData.body, dynamic);
   return g;
 }
-const logos = await loadLogos(),
-  karts = PARTIES.map((_, i) => {
-    const g = prepareKart(makeKart(i, logos));
-    scene.add(g);
-    return g;
-  });
+const karts = PARTIES.map((_, i) => {
+  const g = prepareKart(makeKart(i, logos));
+  scene.add(g);
+  return g;
+});
+// At night the player's kart carries a headlight beam (one light, so it stays cheap).
+const headlight = level.mood === 'night' ? new T.SpotLight('#ffe9c4', 60, 46, 0.5, 0.6, 1.4) : null;
+if (headlight) {
+  scene.add(headlight, headlight.target);
+}
+function updateHeadlight() {
+  if (!headlight) return;
+  const k = karts[selected];
+  headlight.visible = state !== 'home';
+  headlight.position.copy(k.localToWorld(new T.Vector3(0, 2.2, 1.6)));
+  headlight.target.position.copy(k.localToWorld(new T.Vector3(0, 0, 18)));
+}
 const fx = makeEffects(scene, track, karts, reduced);
 const encounters = makeEncounterWorld(scene, track, box, label, mat);
 const trails = makeTrails(scene, reduced);
@@ -805,7 +809,7 @@ function setCamera(snap = false, dt = 1 / 60) {
   camera.fov += (desiredFov - camera.fov) * (snap ? 1 : -Math.expm1(-dt * 5));
   camera.updateProjectionMatrix();
   const focus = state === 'home' || !race ? karts[selected].position : racerFrame(track, race.racers[0]).p;
-  sun.position.copy(focus).add(new T.Vector3(-25, 55, -30));
+  sun.position.copy(focus).add(sunOffset);
   sun.target.position.copy(focus);
 }
 function resize() {
@@ -898,6 +902,8 @@ function frame(now) {
     fx.update(dt, state === 'home' || !race ? null : race);
     updateTrails(dt);
     setCamera(false, dt);
+    scenery.update(elapsed);
+    updateHeadlight();
     for (const p of pickups)
       if (p.type === 'box' || p.type === 'coin') {
         p.mesh.position.y = p.baseY + (reduced ? 0 : Math.sin(elapsed * 2.4 + p.s) * 0.17);

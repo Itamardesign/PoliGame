@@ -1,5 +1,48 @@
 import * as T from './vendor/three.module.min.js';
 import { encountersFor, encounterAt } from './kart-encounters.js';
+import { textCanvasTexture } from './world-kit.js';
+
+// Watermelon rind: dark green stripes over pale green, wrapped around the ball.
+let rindTexture, warningTexture;
+const rind = () =>
+  (rindTexture ??= textCanvasTexture(512, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#7fae4f';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#2f5a24';
+    for (let i = 0; i < 14; i++) {
+      ctx.beginPath();
+      const x = (i / 14) * w;
+      ctx.moveTo(x, 0);
+      for (let y = 0; y <= h; y += 16) ctx.lineTo(x + Math.sin(y * 0.09 + i) * 7, y);
+      for (let y = h; y >= 0; y -= 16) ctx.lineTo(x + 16 + Math.sin(y * 0.09 + i) * 7, y);
+      ctx.fill();
+    }
+  }));
+// Israeli warning sign: white triangle, red border, black exclamation mark.
+const warning = () =>
+  (warningTexture ??= textCanvasTexture(256, 256, (ctx, w) => {
+    ctx.clearRect(0, 0, w, w);
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 14);
+    ctx.lineTo(w - 12, w - 22);
+    ctx.lineTo(12, w - 22);
+    ctx.closePath();
+    ctx.fillStyle = '#d42a2a';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 52);
+    ctx.lineTo(w - 44, w - 42);
+    ctx.lineTo(44, w - 42);
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.fillRect(w / 2 - 9, 100, 18, 70);
+    ctx.beginPath();
+    ctx.arc(w / 2, 192, 11, 0, Math.PI * 2);
+    ctx.fill();
+  }));
+
 export function makeEncounterWorld(scene, track, box, label, mat) {
   const objects = encountersFor(track.id).map(e => {
     const frame = track.at(e.u * track.length),
@@ -10,50 +53,49 @@ export function makeEncounterWorld(scene, track, box, label, mat) {
     const actor = new T.Group();
     root.add(actor);
     if (e.kind === 'ball') {
-      const ball = new T.Mesh(new T.SphereGeometry(1.8, 16, 12), mat('#f4a85e'));
-      ball.position.y = 1.9;
+      // A giant watermelon escaped from the market, rolling across the road.
+      const ball = new T.Mesh(
+        new T.SphereGeometry(1.8, 24, 16),
+        new T.MeshStandardMaterial({ map: rind(), roughness: 0.55 })
+      );
+      ball.scale.set(1, 0.92, 1.12);
+      ball.position.y = 1.7;
       ball.castShadow = true;
       actor.add(ball);
-      const band = new T.Mesh(new T.TorusGeometry(1.81, 0.13, 6, 28), mat('#fff2ba'));
-      ball.add(band);
-      const mark = label('ספין!', 2.1, 0.7, '#fff1be', '#633c3e', 100);
-      mark.position.set(0, 0, -1.82);
-      mark.rotation.y = Math.PI;
-      ball.add(mark);
       actor.userData.ball = ball;
-      for (let i = -4; i <= 4; i++) {
-        const tile = box(root, 1.2, 0.03, 0.7, '#e9af63', i * 2, 0.06, 0);
-        tile.rotation.y = 0.25;
-      }
       for (const side of [-1, 1]) {
-        box(root, 0.25, 3.8, 0.25, '#665b55', side * 10.8, 1.9, 0);
-        const sign = label('זהירות · ספין מתגלגל', 5.5, 0.8, '#f4ba76', '#4d403a', 110);
-        sign.position.set(side * 10.8, 4, 0);
-        sign.rotation.y = Math.PI;
+        box(root, 0.12, 2.6, 0.12, '#8a9096', side * 11.4, 1.3, 9);
+        const sign = new T.Mesh(
+          new T.PlaneGeometry(1.5, 1.5),
+          new T.MeshBasicMaterial({ map: warning(), transparent: true, side: T.DoubleSide })
+        );
+        sign.position.set(side * 11.4, 2.9, 9);
         root.add(sign);
       }
     } else {
+      // A gilded arch over a lane: drive through it for three ballots and a boost.
+      const gold = new T.MeshStandardMaterial({
+        color: '#e6b94f',
+        metalness: 0.25,
+        roughness: 0.35,
+        emissive: '#3a2a08'
+      });
       for (const side of [-1, 1]) {
-        box(actor, 0.45, 5.4, 0.45, '#e5ac41', side * 2.4, 2.7, 0);
-        const bulb = new T.Mesh(
-          new T.SphereGeometry(0.4, 8, 6),
-          new T.MeshBasicMaterial({ color: '#fff3a2' })
-        );
-        bulb.position.set(side * 2.4, 5.4, 0);
-        actor.add(bulb);
+        const post = new T.Mesh(new T.BoxGeometry(0.4, 5, 0.4), gold);
+        post.position.set(side * 2.3, 2.5, 0);
+        post.castShadow = true;
+        actor.add(post);
       }
-      box(actor, 5.3, 0.35, 0.5, '#f8d677', 0, 5.3, 0);
-      const sign = label('בונוס הפתעה!', 5, 1, '#fff0a0', '#4e5140', 120);
-      sign.position.set(0, 4.7, -0.3);
+      const beam = new T.Mesh(new T.BoxGeometry(5, 0.5, 0.5), gold);
+      beam.position.y = 5;
+      actor.add(beam);
+      const sign = label('+3 פתקים', 3.6, 0.8, '#1d2533', '#f2c14e', 110);
+      sign.position.set(0, 4.25, -0.27);
       sign.rotation.y = Math.PI;
       actor.add(sign);
-      const pad = box(actor, 4.5, 0.04, 5, '#f5d979', 0, 0.09, 0);
+      const pad = box(actor, 4.2, 0.04, 4.6, '#2a2618', 0, 0.09, 0);
+      pad.material = new T.MeshStandardMaterial({ color: '#2a2618', emissive: '#6a5014', roughness: 0.6 });
       actor.userData.pad = pad;
-      for (let i = 0; i < 3; i++) {
-        const coin = new T.Mesh(new T.OctahedronGeometry(0.4), new T.MeshBasicMaterial({ color: '#fff4ad' }));
-        coin.position.set((i - 1) * 1.1, 1.3, 0);
-        actor.add(coin);
-      }
     }
     return { e, actor };
   });

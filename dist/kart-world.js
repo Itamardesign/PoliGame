@@ -2,6 +2,9 @@ import * as T from './vendor/three.module.min.js';
 import { makeDriver } from './kart-drivers.js';
 import { PARTIES, rng, clamp, ROAD, SECTORS, sectorAt } from './race-model.js';
 import { levelById } from './kart-levels.js';
+import { batchStatic } from './world-kit.js';
+export { batchStatic };
+export { buildWorld } from './world-set.js';
 const materials = new Map();
 export function mat(c) {
   if (!materials.has(c)) materials.set(c, new T.MeshStandardMaterial({ color: c, roughness: 0.67 }));
@@ -611,473 +614,91 @@ export function makeTrack(levelId = 'jerusalem') {
     bend
   };
 }
-function ribbon(track, offset, width, color, height = 0) {
-  const pos = [],
-    indices = [],
-    uv = [],
-    N = 560;
-  for (let i = 0; i <= N; i++) {
-    for (const edge of [-1, 1]) {
-      const p = track.at((i / N) * track.length, offset + (edge * width) / 2).p;
-      pos.push(p.x, p.y + height, p.z);
-      uv.push(((edge + 1) * width) / 16, ((i / N) * track.length) / 8);
-    }
-    if (i < N) {
-      const n = i * 2;
-      indices.push(n, n + 1, n + 2, n + 1, n + 3, n + 2);
-    }
-  }
-  const geo = new T.BufferGeometry();
-  geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-  const m = new T.Mesh(geo, new T.MeshStandardMaterial({ color, roughness: 1, side: T.DoubleSide }));
-  m.receiveShadow = true;
-  return m;
-}
-export function buildWorld(scene, track) {
-  const rand = rng(6161);
-  box(
-    scene,
-    650,
-    1,
-    600,
-    track.id === 'midnight' ? '#53647a' : track.id === 'market' ? '#b69e70' : '#8dae6e',
-    35,
-    -0.55,
-    0
-  );
-  // Broad, textured tarmac with readable edges and gently sloped, grounded shoulders.
-  scene.add(ribbon(track, 0, 26, '#d4c59d', -0.1));
-  const asphalt = ribbon(
-    track,
-    0,
-    ROAD.halfWidth * 2,
-    track.id === 'midnight' ? '#43485b' : '#59656b',
-    0.035
-  );
-  const grain = document.createElement('canvas');
-  grain.width = grain.height = 128;
-  const ctx = grain.getContext('2d'),
-    noise = ctx.createImageData(128, 128);
-  for (let i = 0; i < noise.data.length; i += 4) {
-    const n = 165 + Math.floor(rand() * 44);
-    noise.data.set([n, n, n, 255], i);
-  }
-  ctx.putImageData(noise, 0, 0);
-  const texture = new T.CanvasTexture(grain);
-  texture.wrapS = texture.wrapT = T.RepeatWrapping;
-  texture.colorSpace = T.SRGBColorSpace;
-  texture.anisotropy = 4;
-  asphalt.material.map = texture;
-  scene.add(asphalt);
-  for (const side of [-1, 1]) {
-    scene.add(ribbon(track, side * 9.25, 0.17, '#f8f5dc', 0.07));
-    scene.add(ribbon(track, side * 10.6, 0.85, '#e8f5ea', 0.045));
-    for (let s = 0; s < track.length; s += 2.6) {
-      const { p, t } = track.at(s, side * 10.35);
-      const curb = box(
-        scene,
-        0.75,
-        0.19,
-        2.5,
-        Math.floor(s / 2.6) % 2 ? '#fff5e2' : track.sectors[sectorAt(s, track.length)].color,
-        p.x,
-        p.y,
-        p.z
-      );
-      curb.rotation.y = Math.atan2(t.x, t.z);
-    }
-    // Embankment extends to the ground so raised track no longer floats above the grass.
-    const vertices = [],
-      idx = [];
-    for (let i = 0; i <= 280; i++) {
-      const inner = track.at((i / 280) * track.length, side * 12.8).p,
-        outer = track.at((i / 280) * track.length, side * 17).p;
-      vertices.push(inner.x, inner.y - 0.13, inner.z, outer.x, -0.05, outer.z);
-      if (i < 280) {
-        const k = i * 2;
-        idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
-      }
-    }
-    const geometry = new T.BufferGeometry();
-    geometry.setAttribute('position', new T.Float32BufferAttribute(vertices, 3));
-    geometry.setIndex(idx);
-    geometry.computeVertexNormals();
-    scene.add(
-      new T.Mesh(geometry, new T.MeshStandardMaterial({ color: '#95ac71', side: T.DoubleSide, roughness: 1 }))
-    );
-  }
-  // Two faint racing lanes leave ample room for overtaking rather than a center divider.
-  for (let s = 6; s < track.length; s += 8)
-    for (const offset of [-3.2, 3.2]) {
-      const { p, t } = track.at(s, offset);
-      const stripe = box(scene, 0.12, 0.025, 2.6, '#c7d0c9', p.x, p.y + 0.065, p.z);
-      stripe.rotation.y = Math.atan2(t.x, t.z);
-    }
-  // The old game's Jerusalem stone, geometric trees and sun-faded palette.
-  function tree(x, z, scale = 1) {
-    const g = new T.Group();
-    g.position.set(x, 0, z);
-    g.scale.setScalar(scale);
-    cyl(g, 0.14, 0.22, 1.8, '#998667', 0, 0.9, 0, 7);
-    const crown = new T.Mesh(new T.IcosahedronGeometry(1.25, 1), mat('#638e50'));
-    crown.position.y = 2.6;
-    crown.scale.set(0.9, 1.35, 0.9);
-    crown.castShadow = true;
-    g.add(crown);
-    scene.add(g);
-  }
-  const samples = Array.from({ length: 150 }, (_, i) => track.at((i / 150) * track.length).p);
-  function near(x, z, d) {
-    return samples.some(p => (p.x - x) ** 2 + (p.z - z) ** 2 < d * d);
-  }
-  for (let i = 0; i < 155; i++) {
-    const x = -115 + rand() * 350,
-      z = -185 + rand() * 360;
-    if (near(x, z, 22) || Math.hypot(x - 42, z) < 36) continue;
-    tree(x, z, 0.8 + rand() * 0.9);
-  }
-  function building(x, z, h, w = 8) {
-    const g = new T.Group();
-    g.position.set(x, 0, z);
-    box(g, w, h, 7, '#e9dfbc', 0, h / 2, 0);
-    box(g, w + 0.4, 0.35, 7.5, '#f8edce', 0, h + 0.1, 0);
-    for (let y = 1.8; y < h - 0.4; y += 2.1)
-      for (let dx = -w / 2 + 1.4; dx < w / 2 - 1; dx += 2.2) {
-        box(g, 0.85, 1.1, 0.09, '#73938d', dx, y, 3.55);
-        box(g, 0.85, 1.1, 0.09, '#73938d', dx, y, -3.55);
-      }
-    scene.add(g);
-  }
-  for (let i = 0; i < 44; i++) {
-    const x = -120 + rand() * 365,
-      z = -185 + rand() * 360;
-    if (!near(x, z, 29) && Math.hypot(x - 42, z) > 38) building(x, z, 4 + rand() * 10, 5 + rand() * 8);
-  }
-  // A miniature Knesset as the central landmark, with colonnades and a forecourt.
-  const kn = new T.Group();
-  kn.position.set(44, 0, 10);
-  scene.add(kn);
-  box(kn, 39, 0.7, 23, '#d9cdab', 0, 0.15, 0);
-  box(kn, 32, 6, 15, '#ddcfaa', 0, 3.6, 0);
-  box(kn, 37, 0.65, 19, '#f6edcf', 0, 7, 0);
-  box(kn, 38, 0.25, 20, '#ede3c1', 0, 7.5, 0);
-  for (let x = -16; x <= 16; x += 2.7) {
-    box(kn, 0.65, 6.5, 0.7, '#f4e9c5', x, 3.5, 9);
-    box(kn, 0.65, 6.5, 0.7, '#f4e9c5', x, 3.5, -9);
-  }
-  for (let i = 0; i < 5; i++) box(kn, 34, 0.3, 1.2, '#ecdfb9', 0, 0.6 - i * 0.1, 10 + i * 0.8);
-  const ks = label('הכנסת', 10, 2, '#f6edcf', '#637a69', 100);
-  ks.position.set(0, 7, 9.6);
-  kn.add(ks);
-  cyl(kn, 0.09, 0.12, 15, '#ebeee1', 21, 7.5, 5);
-  const flag = label('✡', 4.5, 2.7, '#fcf9e9', '#4783b3', 130);
-  flag.position.set(23.2, 13, 5);
-  kn.add(flag);
-  // Starting gantry, chequered road, grandstands and campaign decorations.
-  const start = new T.Group();
-  scene.add(start);
-  scene.userData.gantry = start;
-  const { p, t } = track.at(0);
-  start.position.copy(p);
-  start.rotation.y = Math.atan2(t.x, t.z);
-  for (const x of [-11.8, 11.8]) {
-    box(start, 0.55, 11, 0.55, '#385d4c', x, 5.5, 0);
-    box(start, 1.6, 0.6, 1.8, '#e8e5c7', x, 0.3, 0);
-  }
-  box(start, 24.2, 1.5, 0.8, '#e9fa91', 0, 10.5, 0);
-  const title = label('המרוץ לכיסא', 21, 1.2, '#e9fa91', '#2c4938', 95);
-  title.position.set(0, 10.5, -0.43);
-  title.rotation.y = Math.PI;
-  start.add(title);
-  const back = title.clone();
-  back.rotation.y = 0;
-  back.position.z = 0.43;
-  start.add(back);
-  for (let x = -10; x < 10; x++)
-    for (let z = -1; z < 1; z++) {
-      box(start, 1, 0.025, 1, (x + z) % 2 ? '#f9f4dc' : '#334d40', x + 0.5, 0.07, z + 0.5);
-    }
-  for (let i = 0; i < 5; i++) {
-    box(start, 12, 0.6, 1.2, '#d6c9a4', 17, 0.3 + i * 0.6, 3 + i * 1.3);
-    for (let j = 0; j < 10; j++) {
-      const c = ['#cf7551', '#6487b0', '#e6bc61', '#8bab75'][Math.floor(rand() * 4)];
-      ball(start, 0.26, c, 12 + j * 1.1, 1 + i * 0.6, 3 + i * 1.3, 0.8, 1.3, 0.8);
-    }
-  }
-  for (let s = 28; s < track.length; s += 38) {
-    const side = Math.floor(s / 38) % 2 ? 1 : -1;
-    const { p, t } = track.at(s, side * 17.8);
-    const pole = new T.Group();
-    pole.position.copy(p);
-    pole.rotation.y = Math.atan2(t.x, t.z) + (side > 0 ? Math.PI / 2 : -Math.PI / 2);
-    scene.add(pole);
-    box(pole, 0.12, 3.2, 0.12, '#ddd8b8', 0, 1.6, 0);
-    const sign = label(
-      ['עוד סיבוב בחירות', 'זהירות: ספין', 'הבטחות ללא כיסוי', 'פנייה פוליטית חדה', '61 זה רק ההתחלה'][
-        Math.floor(s / 38) % 5
-      ],
-      4.5,
-      1.2,
-      '#f5edcb',
-      '#436048',
-      75
-    );
-    sign.position.y = 3.2;
-    pole.add(sign);
-  }
-  // Bunting across the starting straight.
-  for (let z of [16, 35])
-    for (let i = 0; i < 17; i++) {
-      const triangle = new T.Mesh(
-        new T.ConeGeometry(0.4, 0.7, 3),
-        mat(['#ee8759', '#f0d274', '#72a6b5', '#edf2cb'][i % 4])
-      );
-      triangle.rotation.z = Math.PI;
-      triangle.position.set(-10 + i * 1.25, 10 - Math.sin((i / 16) * Math.PI) * 1.5, z);
-      scene.add(triangle);
-    }
-  // Background hills, clouds and a warm sun.
-  for (let i = 0; i < 17; i++) {
-    const a = (i / 17) * Math.PI * 2;
-    const hill = new T.Mesh(
-      new T.IcosahedronGeometry(35 + rand() * 30, 1),
-      mat(i % 2 ? '#a9c392' : '#a2be8c')
-    );
-    hill.position.set(35 + Math.cos(a) * 220, -7, Math.sin(a) * 205);
-    hill.scale.y = 0.4;
-    scene.add(hill);
-  }
-  for (let i = 0; i < 13; i++) {
-    const g = new T.Group();
-    g.position.set(-170 + rand() * 370, 40 + rand() * 30, -155 + rand() * 300);
-    for (let j = 0; j < 3; j++) ball(g, 4 + rand() * 3, '#f5f3dc', j * 5, 0, 0, 1, 0.4, 0.55);
-    scene.add(g);
-  }
-  addCircuitDetails(scene, track);
-  return samples;
-}
+// Gameplay props, modelled on real things: a ballot box (קלפי), a ballot slip, a roadworks
+// barrier, a steel jump ramp and a boost strip set into the asphalt.
 export function makePickup(type) {
   const g = new T.Group();
+  const glow = c =>
+    new T.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.2, roughness: 0.4 });
   if (type === 'ramp') {
-    const platform = box(g, 5, 0.3, 4, '#bc82e7', 0, 0.4, 0);
-    platform.rotation.x = -0.19;
-    for (const x of [-2.5, 2.5]) box(g, 0.15, 0.35, 4, '#ffeac0', x, 0.3, 0);
-    const sign = label('↑', 2.2, 2.2, '#bc82e7', '#fff2bc', 145);
-    sign.rotation.x = -Math.PI / 2;
-    sign.position.set(0, 0.83, 0.5);
-    g.add(sign);
+    const deck = box(g, 5, 0.25, 4, '#8d969c', 0, 0.42, 0);
+    deck.rotation.x = -0.19;
+    deck.material = new T.MeshStandardMaterial({ color: '#8d969c', metalness: 0.6, roughness: 0.45 });
+    for (const x of [-2.45, 2.45])
+      for (let k = 0; k < 5; k++) {
+        const stripe = box(
+          g,
+          0.16,
+          0.3,
+          0.8,
+          k % 2 ? '#1d1d1d' : '#f2c14e',
+          x,
+          0.36 + (k - 2) * 0.15,
+          (k - 2) * 0.8
+        );
+        stripe.rotation.x = -0.19;
+      }
+    box(g, 5, 0.9, 0.2, '#5c6468', 0, 0.45, -1.95);
   }
   if (type === 'box') {
-    const b = box(g, 1.4, 1.4, 1.4, '#e9d16f', 0, 1.7, 0);
-    b.rotation.z = 0.15;
-    for (const z of [-0.72, 0.72]) {
-      const q = label('?', 0.95, 1, '#e9d16f', '#fffcec', 140);
-      q.position.set(0, 1.7, z);
-      if (z < 0) q.rotation.y = Math.PI;
-      g.add(q);
+    // A blue ballot box with a white slot lid and an envelope half posted.
+    box(g, 1.3, 1.25, 1.0, '#2f6fd6', 0, 1.65, 0);
+    box(g, 1.36, 0.12, 1.06, '#f3f4f6', 0, 2.3, 0);
+    box(g, 0.7, 0.03, 0.1, '#1b2433', 0, 2.37, 0);
+    const env = box(g, 0.55, 0.42, 0.04, '#e8eef9', 0, 2.55, 0);
+    env.rotation.z = 0.08;
+    for (const z of [-0.51, 0.51]) {
+      const word = label('קלפי', 1.05, 0.42, '#2f6fd6', '#ffffff', 120);
+      word.position.set(0, 1.62, z);
+      if (z < 0) word.rotation.y = Math.PI;
+      g.add(word);
     }
-    const ring = new T.Mesh(new T.TorusGeometry(1.05, 0.06, 6, 24), mat('#faf1b1'));
+    const ring = new T.Mesh(new T.TorusGeometry(0.95, 0.05, 6, 28), glow('#7fb2ff'));
     ring.rotation.x = Math.PI / 2;
-    ring.position.y = 0.4;
+    ring.position.y = 0.3;
     g.add(ring);
   }
   if (type === 'coin') {
-    box(g, 0.65, 0.9, 0.11, '#fff6d6', 0, 1.2, 0);
-    const note = label('61', 0.5, 0.6, '#fff6d6', '#4391a4', 130);
-    note.position.set(0, 1.2, 0.06);
-    g.add(note);
+    // A ballot slip: white paper with a printed letter block.
+    box(g, 0.62, 0.84, 0.03, '#fbfbf7', 0, 1.25, 0);
+    const slip = label('פתק', 0.5, 0.5, '#fbfbf7', '#1d1d1d', 120);
+    for (const z of [-0.02, 0.02]) {
+      const face = slip.clone();
+      face.position.set(0, 1.27, z);
+      if (z < 0) face.rotation.y = Math.PI;
+      g.add(face);
+    }
   }
   if (type === 'barrier') {
-    for (const x of [-0.75, 0.75]) box(g, 0.14, 1.3, 0.2, '#637568', x, 0.65, 0);
-    box(g, 2.05, 0.65, 0.5, '#dc805d', 0, 1, 0);
-    for (const x of [-0.7, 0, 0.7]) {
-      const b = box(g, 0.24, 0.59, 0.03, '#fae9be', x, 1, -0.27);
-      b.rotation.z = 0.35;
+    // Roadworks barrier: red and white boards on A-frame legs, an amber lamp on top.
+    for (const x of [-0.9, 0.9]) {
+      const l1 = box(g, 0.08, 1.3, 0.08, '#3d3d3d', x, 0.62, -0.18);
+      l1.rotation.x = 0.28;
+      const l2 = box(g, 0.08, 1.3, 0.08, '#3d3d3d', x, 0.62, 0.18);
+      l2.rotation.x = -0.28;
     }
-    const sign = label('ספין!', 1.3, 0.43, '#f5edcb', '#a24e36', 100);
-    sign.position.set(0, 1.7, -0.1);
-    sign.rotation.y = Math.PI;
-    g.add(sign);
+    for (const y of [0.55, 1.05]) {
+      box(g, 2.2, 0.32, 0.06, '#f5f5f2', 0, y, 0);
+      for (let k = 0; k < 4; k++) {
+        const stripe = box(g, 0.28, 0.32, 0.07, '#d63a3a', -0.8 + k * 0.55, y, 0);
+        stripe.rotation.z = 0.55;
+        stripe.scale.y = 1.05;
+      }
+    }
+    const lamp = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, 0.16, 10), glow('#ffb12e'));
+    lamp.position.set(0.85, 1.32, 0);
+    g.add(lamp);
+    g.userData.blink = lamp;
   }
   if (type === 'boost') {
-    box(g, 3.5, 0.07, 6.4, '#45cce0', 0, 0.1, 0);
-    for (let z = -2.3; z < 2.5; z += 1.2) {
-      const a = box(g, 0.15, 0.02, 1.1, '#f0ffb1', -0.35, 0.14, z);
-      a.rotation.y = -0.7;
-      const b = box(g, 0.15, 0.02, 1.1, '#f0ffb1', 0.35, 0.14, z);
-      b.rotation.y = 0.7;
-    }
+    box(g, 3.4, 0.05, 6.2, '#25303a', 0, 0.09, 0);
+    for (let z = -2.3; z < 2.5; z += 1.2)
+      for (const sx of [-1, 1]) {
+        const chevron = new T.Mesh(new T.BoxGeometry(0.16, 0.02, 1.15), glow('#55e0ff'));
+        chevron.position.set(sx * 0.36, 0.13, z);
+        chevron.rotation.y = sx * -0.7;
+        g.add(chevron);
+      }
   }
   return g;
-}
-// Merge static colored geometry by material to keep the scene responsive on laptops and phones.
-export function batchStatic(root, exclude = new Set()) {
-  root.updateMatrixWorld(true);
-  const groups = new Map(),
-    inverse = root.matrixWorld.clone().invert(),
-    remove = [];
-  root.traverse(m => {
-    if (!m.isMesh || m.material.map || m.material.vertexColors || Array.isArray(m.material) || exclude.has(m))
-      return;
-    const key = m.material;
-    let bucket = groups.get(key);
-    if (!bucket) {
-      bucket = [];
-      groups.set(key, bucket);
-    }
-    const geo = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
-    geo.applyMatrix4(inverse.clone().multiply(m.matrixWorld));
-    bucket.push(geo);
-    remove.push(m);
-  });
-  for (const [material, list] of groups) {
-    const merged = new T.BufferGeometry();
-    for (const attr of ['position', 'normal', 'uv']) {
-      const parts = list.map(g => g.getAttribute(attr));
-      if (parts.some(p => !p)) continue;
-      const length = parts.reduce((s, p) => s + p.array.length, 0),
-        buffer = new Float32Array(length);
-      let offset = 0;
-      for (const p of parts) {
-        buffer.set(p.array, offset);
-        offset += p.array.length;
-      }
-      merged.setAttribute(attr, new T.BufferAttribute(buffer, parts[0].itemSize));
-    }
-    const mesh = new T.Mesh(merged, material);
-    mesh.castShadow = mesh.receiveShadow = true;
-    root.add(mesh);
-    list.forEach(g => g.dispose());
-  }
-  remove.forEach(m => m.removeFromParent());
-}
-
-function addCircuitDetails(scene, track) {
-  const rand = rng(74161);
-  function along(s, x = 0) {
-    const g = new T.Group(),
-      { p, t } = track.at(s, x);
-    g.position.copy(p);
-    if (Math.abs(x) >= 17) g.position.y = 0;
-    g.rotation.y = Math.atan2(t.x, t.z);
-    scene.add(g);
-    return g;
-  }
-  // Four visual districts, each with a color gate and its own landmark.
-  track.sectors.slice(1).forEach((section, i) => {
-    const g = along(section.start * track.length);
-    for (const x of [-12.1, 12.1]) {
-      box(g, 0.65, 10.6, 0.65, '#f8f2df', x, 5.3, 0);
-      box(g, 1.5, 0.7, 1.7, section.color, x, 0.35, 0);
-      box(g, 0.22, 6.7, 0.15, section.color, x, 4.2, -0.36);
-    }
-    box(g, 24.7, 1.05, 0.6, section.color, 0, 10.8, 0);
-    const text = label(section.name, 15, 0.88, section.color, '#213946', 95);
-    text.position.set(0, 10.8, -0.33);
-    text.rotation.y = Math.PI;
-    g.add(text);
-    for (const x of [-9, 9]) {
-      const number = label('0' + (i + 2), 2, 0.88, section.color, '#213946', 110);
-      number.position.set(x, 10.8, -0.34);
-      number.rotation.y = Math.PI;
-      g.add(number);
-    }
-  });
-  // Bank-side chevrons and reflective bollards telegraph the sharp turns early.
-  for (let s = 18; s < track.length; s += 9) {
-    const bend = track.bend(s),
-      side = bend > 0 ? 1 : -1;
-    for (const edge of [-1, 1]) {
-      const g = along(s, edge * 12.1);
-      box(g, 0.16, 1.1, 0.16, '#f4edce', 0, 0.55, 0);
-      box(g, 0.18, 0.22, 0.18, track.sectors[sectorAt(s, track.length)].color, 0, 0.94, 0);
-    }
-    if (Math.abs(bend) > 0.015 && Math.floor(s / 9) % 2 === 0) {
-      const g = along(s, side * 14.3);
-      box(g, 0.12, 2, 0.12, '#526d5d', 0, 1, 0);
-      const sign = label(bend > 0 ? '❮❮❮' : '❯❯❯', 3.6, 1.3, '#243c45', '#efff9b', 110);
-      sign.position.set(0, 2.4, 0);
-      sign.rotation.y = Math.PI;
-      g.add(sign);
-    }
-  }
-  // Elevated promenade: guardrails, crossbeams and warm sandstone bridge piers.
-  for (let s = track.length * 0.24; s < track.length * 0.39; s += 6) {
-    const g = along(s);
-    for (const x of [-14.3, 14.3]) {
-      box(g, 0.28, 1.25, 0.28, '#ded2b4', x, 0.63, 0);
-      box(g, 0.24, 0.19, 6.2, '#937ad6', x, 1.28, 0);
-      box(g, 0.13, 0.12, 6.2, '#d0c2fa', x, 0.72, 0);
-    }
-    const h = g.position.y + 0.7;
-    for (const x of [-7.6, 7.6]) box(g, 1.3, h, 1.7, '#d6c7a8', x, -h / 2 - 0.12, 0);
-    box(g, 24, 0.45, 1, '#d6c7a8', 0, -0.38, 0);
-  }
-  // Market hairpin: striped awnings, produce crates and campaign café counters.
-  for (let i = 0; i < 12; i++) {
-    const s = track.length * (0.49 + i * 0.011),
-      side = i % 2 ? 1 : -1,
-      g = along(s, side * (20 + (i % 3)));
-    g.rotation.y += side > 0 ? -Math.PI / 2 : Math.PI / 2;
-    const color = ['#e98758', '#54b9bb', '#e4b94f'][i % 3];
-    box(g, 4.4, 1.35, 2.2, '#c99f69', 0, 0.67, 0);
-    for (const x of [-2, 2]) box(g, 0.14, 3.7, 0.14, '#957655', x, 1.85, 0);
-    for (let stripe = 0; stripe < 8; stripe++) {
-      const awning = box(g, 0.6, 0.16, 3.8, stripe % 2 ? '#fff0cc' : color, -2.1 + stripe * 0.6, 3.65, 0.25);
-      awning.rotation.x = 0.12;
-    }
-    for (let j = 0; j < 6; j++) ball(g, 0.27, j % 2 ? '#ed7851' : '#a7c855', (j - 2.5) * 0.55, 1.58, 0.4);
-    const sign = label(['קפה קואליציה', 'פלאפל 61', 'הבטחות בשקל'][i % 3], 3.7, 0.65, color, '#273b35', 80);
-    sign.position.set(0, 2.55, 1.05);
-    g.add(sign);
-  }
-  // Monumental ballot box and a balloon: landmarks you can recognize at speed.
-  const ballot = along(track.length * 0.58, -30);
-  box(ballot, 6, 6, 6, '#f6eed6', 0, 3, 0);
-  box(ballot, 6.3, 0.45, 6.3, '#3784af', 0, 6.2, 0);
-  box(ballot, 3.7, 0.035, 0.48, '#253c45', 0, 6.445, 0);
-  const paper = box(ballot, 2.6, 3.4, 0.1, '#fffdf0', 0, 7.9, 0);
-  paper.rotation.z = 0.17;
-  const number = label('61', 4, 3, '#f6eed6', '#2f7599', 145);
-  number.position.set(0, 3.5, -3.04);
-  number.rotation.y = Math.PI;
-  ballot.add(number);
-  const balloon = along(track.length * 0.12, 30);
-  const envelope = ball(balloon, 4.8, '#f2ba58', 0, 19, 0, 1, 1.23, 1);
-  for (const x of [-1.3, 1.3]) cyl(balloon, 0.035, 0.035, 4, '#f6edcf', x, 12.5, 0);
-  box(balloon, 2.8, 1.4, 2, '#976c49', 0, 10.8, 0);
-  const balloonText = label('61', 5, 3, '#f2ba58', '#314b40', 140);
-  balloonText.position.set(0, 19, -4.82);
-  balloonText.rotation.y = Math.PI;
-  balloon.add(balloonText);
-  // Park hairpin: flower beds, stylized cypresses and a windmill on the skyline.
-  for (let i = 0; i < 22; i++) {
-    const g = along(track.length * (0.77 + i * 0.007), i % 2 ? 19 : -19);
-    for (let j = 0; j < 4; j++) {
-      cyl(g, 0.04, 0.04, 0.48, '#547c48', (j - 1.5) * 0.5, 0.24, 0, 5);
-      ball(g, 0.17, ['#f2c552', '#e58aaa', '#dcd4f4'][i % 3], (j - 1.5) * 0.5, 0.59, 0);
-    }
-  }
-  const mill = along(track.length * 0.83, -29);
-  cyl(mill, 2, 3.5, 11, '#e6d9b7', 0, 5.5, 0);
-  cyl(mill, 0, 3.1, 3, '#b87b56', 0, 12.5, 0, 8);
-  for (let i = 0; i < 4; i++) {
-    const blade = new T.Group();
-    blade.position.set(0, 10, -3);
-    blade.rotation.z = Math.PI / 4 + (i * Math.PI) / 2;
-    box(blade, 0.23, 6, 0.18, '#866c4c', 0, 2.8, 0);
-    box(blade, 0.95, 3.7, 0.11, '#f5ebcf', 0.4, 3.9, 0);
-    mill.add(blade);
-  }
-  ball(mill, 0.42, '#7f674c', 0, 10, -3.15);
-  for (let s = 45; s < track.length; s += 60) {
-    const g = along(s, 18);
-    for (let i = 0; i < 3; i++) {
-      cyl(g, 0.12, 0.19, 1.5, '#8e7857', i * 1.8, 0.75, 0, 6);
-      cyl(g, 0.05, 0.7, 4, '#4e825b', i * 1.8, 3.1, 0, 7);
-    }
-  }
 }

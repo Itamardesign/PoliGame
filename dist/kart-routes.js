@@ -1,4 +1,5 @@
 import * as T from './vendor/three.module.min.js';
+import { kitMaterial, scaledBox, instanced, GEO } from './world-kit.js';
 export const SHORTCUTS = [
   {
     id: 'garden',
@@ -66,14 +67,21 @@ export function routeBend(track, r) {
   const route = r.routeId && track.shortcuts.find(p => p.id === r.routeId);
   return route ? route.bend(r.routeDistance) : track.bend(r.s);
 }
+// The two secret routes, dressed as real places: an almond-blossom garden path and a
+// Nachlaot-style stone alley under arches and washing lines. Lanterns mark the line.
 export function buildShortcuts(parent, track, box, label, mat) {
+  const stone = kitMaterial('stone'),
+    paving = kitMaterial('paving');
   for (const route of track.shortcuts) {
+    const garden = route.id === 'garden';
     const positions = [],
+      uvs = [],
       indices = [];
     for (let i = 0; i <= 100; i++) {
       for (const side of [-1, 1]) {
         const p = route.at((i / 100) * route.length, (side * route.width) / 2).p;
         positions.push(p.x, p.y + 0.13, p.z);
+        uvs.push(side < 0 ? 0 : route.width / 3, ((i / 100) * route.length) / 3);
       }
       if (i < 100) {
         const n = i * 2;
@@ -82,92 +90,106 @@ export function buildShortcuts(parent, track, box, label, mat) {
     }
     const geo = new T.BufferGeometry();
     geo.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
     geo.setIndex(indices);
     geo.computeVertexNormals();
-    const path = new T.Mesh(
-      geo,
-      new T.MeshStandardMaterial({
-        color: route.id === 'garden' ? '#c099af' : '#bd9c71',
-        side: T.DoubleSide,
-        roughness: 1
-      })
-    );
+    const path = new T.Mesh(geo, garden ? paving : stone);
     path.receiveShadow = true;
     parent.add(path);
-    for (let d = 7; d < route.length - 7; d += 4) {
-      const { p, t } = route.at(d);
-      const tile = box(
-        parent,
-        route.width - 0.4,
-        0.12,
-        3.2,
-        route.id === 'garden' ? '#edc8d7' : '#f1d6a8',
-        p.x,
-        p.y + 0.1,
-        p.z
-      );
-      tile.rotation.y = Math.atan2(t.x, t.z);
+
+    // Lanterns along both edges instead of floating gems.
+    const lanterns = [],
+      glows = [];
+    for (let d = 6; d < route.length - 6; d += 7)
       for (const side of [-1, 1]) {
-        const e = route.at(d, side * (route.width / 2 + 0.35)).p;
-        const gem = new T.Mesh(
-          new T.OctahedronGeometry(0.26),
-          new T.MeshBasicMaterial({ color: route.color })
-        );
-        gem.position.copy(e);
-        gem.position.y += 0.75;
-        parent.add(gem);
+        const e = route.at(d, side * (route.width / 2 + 0.45)).p;
+        lanterns.push({ x: e.x, y: e.y, z: e.z });
+        glows.push({ x: e.x, y: e.y + 0.95, z: e.z });
       }
-    }
-    // Leafy entrance conceals the branch until you notice the colored stones and question mark.
+    instanced(
+      parent,
+      new T.CylinderGeometry(0.06, 0.08, 0.9, 6).translate(0, 0.45, 0),
+      kitMaterial('dark-metal'),
+      lanterns
+    );
+    instanced(
+      parent,
+      new T.BoxGeometry(0.26, 0.32, 0.26),
+      new T.MeshStandardMaterial({ color: route.color, emissive: route.color, emissiveIntensity: 1.1 }),
+      glows,
+      { shadow: false }
+    );
+
+    // Stone gateway at the entrance with a small street sign.
     const entrance = new T.Group(),
       a = route.at(0);
     entrance.position.copy(a.p);
     entrance.rotation.y = Math.atan2(a.t.x, a.t.z);
     parent.add(entrance);
-    for (const x of [-3.1, 3.1]) {
-      box(entrance, 0.35, 4.6, 0.35, '#94714f', x, 2.3, 0);
-      for (let j = 0; j < 3; j++) {
-        const leaf = new T.Mesh(
-          new T.IcosahedronGeometry(1.05, 1),
-          mat(route.id === 'garden' ? '#62865c' : '#8d9871')
-        );
-        leaf.position.set(x, 2.5 + j * 0.85, 0);
-        entrance.add(leaf);
-      }
+    for (const x of [-3.2, 3.2]) {
+      const pier = new T.Mesh(scaledBox(1.1, 4.8, 1.1), stone);
+      pier.position.set(x, 2.4, 0);
+      pier.castShadow = true;
+      entrance.add(pier);
     }
-    box(entrance, 6.6, 0.25, 0.4, '#987753', 0, 4.7, 0);
-    const sign = label('? ↗', 2.8, 0.85, route.color, '#3b3b42', 130);
-    sign.position.set(0, 4.55, -0.24);
+    const lintel = new T.Mesh(scaledBox(7.6, 1, 1.2), stone);
+    lintel.position.set(0, 5.2, 0);
+    entrance.add(lintel);
+    const sign = label(garden ? 'גן' : 'סמטה', 1.6, 0.6, '#f4f2ea', '#1f3b6e', 120);
+    sign.position.set(0, 5.2, -0.62);
     sign.rotation.y = Math.PI;
     entrance.add(sign);
-    for (let d = 15; d < route.length - 10; d += 13) {
-      const a = route.at(d),
+
+    // Along the route: almond trees in blossom, or alley walls with arches and washing lines.
+    const trunks = [],
+      crowns = [];
+    for (let d = 12; d < route.length - 10; d += garden ? 9 : 11) {
+      const at = route.at(d),
         g = new T.Group();
-      g.position.copy(a.p);
-      g.rotation.y = Math.atan2(a.t.x, a.t.z);
+      g.position.copy(at.p);
+      g.rotation.y = Math.atan2(at.t.x, at.t.z);
       parent.add(g);
-      if (route.id === 'garden') {
+      if (garden) {
         for (const side of [-1, 1]) {
-          const trunk = box(g, 0.28, 5, 0.28, '#84654c', side * 3.8, 2.5, 0);
-          const crown = new T.Mesh(new T.IcosahedronGeometry(2, 1), mat('#ed9bbf'));
-          crown.position.set(side * 3.8, 5.5, 0);
-          crown.castShadow = true;
-          g.add(crown);
+          const q = route.at(d, side * 4.4).p;
+          trunks.push({ x: q.x, y: q.y, z: q.z, ry: d, s: 0.9 });
+          crowns.push({ x: q.x, y: q.y, z: q.z, ry: d, s: 0.9 });
         }
       } else {
         for (const side of [-1, 1]) {
-          box(g, 1.6, 4.7, 8.5, '#cfae82', side * 3.7, 2.35, 0);
-          box(g, 1.8, 0.24, 9, '#edc899', side * 3.7, 4.8, 0);
+          const wall = new T.Mesh(scaledBox(1.4, 5.2, 10.5), stone);
+          wall.position.set(side * 3.6, 2.6, 0);
+          wall.castShadow = wall.receiveShadow = true;
+          g.add(wall);
         }
-        box(g, 8.5, 0.26, 2.5, '#e9be7f', 0, 5.2, 0);
+        const arch = new T.Mesh(new T.TorusGeometry(3.6, 0.45, 6, 16, Math.PI), stone);
+        arch.position.set(0, 4.6, 0);
+        g.add(arch);
+        const line = new T.Mesh(new T.CylinderGeometry(0.015, 0.015, 7.2, 4), kitMaterial('dark-metal'));
+        line.rotation.z = Math.PI / 2;
+        line.position.set(0, 4.2, 2.5);
+        g.add(line);
+        ['#e8e4da', '#c94f4f', '#4f79c9', '#e6c25a'].forEach((c, k) => {
+          const cloth = new T.Mesh(
+            new T.PlaneGeometry(0.7, 0.9),
+            new T.MeshStandardMaterial({ color: c, side: T.DoubleSide })
+          );
+          cloth.position.set(-2.4 + k * 1.6, 3.7, 2.5);
+          g.add(cloth);
+        });
       }
     }
+    if (garden) {
+      instanced(parent, GEO.oliveTrunk(), kitMaterial('trunk'), trunks);
+      instanced(parent, GEO.oliveCrown(), kitMaterial('#f1d3dc'), crowns);
+    }
+    // The jump: a stone kicker with hazard paint.
     const ramp = route.at(route.length * 0.57),
       g = new T.Group();
     g.position.copy(ramp.p);
     g.rotation.y = Math.atan2(ramp.t.x, ramp.t.z);
     parent.add(g);
-    const rampMesh = box(g, route.width - 0.5, 0.22, 3, route.color, 0, 0.35, 0);
+    const rampMesh = box(g, route.width - 0.5, 0.22, 3, '#f2c14e', 0, 0.35, 0);
     rampMesh.rotation.x = -0.18;
   }
 }
