@@ -549,8 +549,8 @@ export function makeKart(index, logos) {
     flames.push(flame);
   }
   g.userData.flames = flames;
-  const name = label(p.short, 1.7, 0.48, '#f4f5dc', '#294330', 90);
-  name.position.set(0, 4.6, 0);
+  const name = nameTag(p);
+  name.position.set(0, 4.3, 0);
   name.visible = false;
   root.add(name);
   g.userData.name = name;
@@ -738,4 +738,31 @@ function makeReactions(head, spec) {
   paper.rotation.x = -0.35;
   paper.visible = false;
   return { stars, swirl, paper };
+}
+
+// A small broadcast-style name tag: dark pill, party-colour stripe, white name.
+function nameTag(p) {
+  const c = document.createElement('canvas');
+  c.width = 384;
+  c.height = 96;
+  const x = c.getContext('2d');
+  x.fillStyle = 'rgba(11,20,34,0.86)';
+  x.beginPath();
+  x.roundRect(4, 8, 376, 80, 18);
+  x.fill();
+  x.fillStyle = p.color;
+  x.beginPath();
+  x.roundRect(332, 20, 14, 56, 4);
+  x.fill();
+  x.fillStyle = '#ffffff';
+  x.font = '800 50px Heebo, Arial';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.fillText(p.short, 170, 52, 290);
+  const t = new T.CanvasTexture(c);
+  t.colorSpace = T.SRGBColorSpace;
+  return new T.Mesh(
+    new T.PlaneGeometry(1.5, 0.375),
+    new T.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, side: T.DoubleSide })
+  );
 }

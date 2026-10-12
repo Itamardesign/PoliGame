@@ -1852,3 +1852,15 @@ dialog#info kbd {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* On small screens long sheets scroll, but their action buttons stay in reach. */
+@media (max-width: 760px), (max-height: 520px) {
+  .sheet > .actions {
+    position: sticky;
+    bottom: calc(-1 * clamp(18px, 3vw, 30px));
+    margin-bottom: calc(-1 * clamp(18px, 3vw, 30px));
+    padding: 12px 0 clamp(18px, 3vw, 30px);
+    background: linear-gradient(transparent, var(--panel-solid) 22%);
+    z-index: 2;
+  }
+}

@@ -875,7 +875,10 @@ function updateKarts(dt) {
     for (const f of kart.userData.fx)
       f.mesh.visible = reduced || Math.floor(elapsed * f.rate + (f.phase || 0)) % 2 === 0;
     kart.visible = true;
-    kart.userData.name.visible = !r.player && (state === 'running' || state === 'countdown');
+    // Name tags only at mid range: close karts are obvious, distant ones would be noise.
+    const range = kart.position.distanceTo(camera.position);
+    kart.userData.name.visible =
+      !r.player && (state === 'running' || state === 'countdown') && range > 9 && range < 70;
     kart.userData.name.quaternion.copy(camera.quaternion).premultiply(kart.quaternion.clone().invert());
   }
 }
