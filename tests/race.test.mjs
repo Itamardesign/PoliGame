@@ -192,3 +192,14 @@ test('lower sensitivity supports fine corrections while high sensitivity turns f
   }
   assert.ok(b.racers[0].x - a.racers[0].x > 1);
 });
+
+test('walls hold a kart in, bounce it back and cost some pace', () => {
+  const r = makeRace(0, 'normal', 6161, 760, [], 'jerusalem', { pickups: false, walls: () => 10 });
+  r.racers.slice(1).forEach((x, i) => (x.s = -1000 - i * 10));
+  const p = r.racers[0];
+  p.speed = 34;
+  for (let i = 0; i < 90; i++) stepRace(r, 1 / 60, { steer: 1, accelerate: true });
+  assert.ok(Math.abs(p.x) <= 10 + 1e-9);
+  assert.ok(r.events.some(e => e.type === 'wall' && e.player));
+  assert.ok(p.speed < 34);
+});

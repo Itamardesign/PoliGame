@@ -159,6 +159,8 @@ export function makeRace(
     random,
     routes,
     bend,
+    // Solid sides (bridge rails, crowd barriers): distance from the centre line, or null.
+    walls: options.walls ?? (() => null),
     pickups: options.pickups === false ? [] : layoutPickups(length, bend),
     events: [],
     eventSeq: 0,
@@ -415,6 +417,21 @@ export function stepRace(race, dt, input = {}, curve = 0) {
     r.lateral += (desired - r.lateral) * -Math.expm1(-dt * (requested === 0 ? 20 : 12));
     r.x = clamp(r.x + r.lateral * dt, -ROAD.maxOffset, ROAD.maxOffset);
     if (Math.abs(r.x) >= ROAD.maxOffset) r.lateral = 0;
+    // Scraping a wall: pushed back inside, sideways speed bounces off, a little pace is lost.
+    const wall = r.routeId ? null : race.walls(r.s);
+    if (wall !== null && Math.abs(r.x) > wall) {
+      const side = Math.sign(r.x);
+      r.x = side * wall;
+      if (r.lateral * side > 2.5) {
+        r.speed *= 0.86;
+        if ((r.wallCooldown ?? 0) <= race.time) {
+          r.wallCooldown = race.time + 0.45;
+          emitRace(race, 'wall', r, { side });
+        }
+      }
+      if (r.lateral * side > 0) r.lateral = -r.lateral * 0.35;
+      r.drifting = false;
+    }
     if (r.drifting) {
       if (!wasDrifting) {
         r.hop = 0.23;

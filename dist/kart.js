@@ -290,6 +290,14 @@ function updateTrails(dt) {
 // Pickups follow the same deterministic layout the race simulates, index for index. Each kind
 // is drawn as instances: one draw call per part of the model, however many sit on the track.
 const bend = s => track.bend(s);
+// The bridge deck has rails and the start straight has crowd barriers: both are solid.
+const walls = s => {
+  const at = ((s % track.length) + track.length) % track.length,
+    u = at / track.length;
+  if (u > 0.25 && u < 0.38) return 10.9;
+  if (at > track.length - 46 || at < 70) return 12.7;
+  return null;
+};
 const pickups = layoutPickups(track.length, bend).map(({ type, s, x }) => {
   const { p, t } = track.at(s, x);
   return { type, s, x, pos: p, yaw: Math.atan2(t.x, t.z), visible: true, spin: 0 };
@@ -515,6 +523,7 @@ function startRace_() {
     level.id,
     {
       bend,
+      walls,
       ...(inGp ? GP.raceOptions(gp) : {}),
       ...(trial ? { solo: true } : {})
     }

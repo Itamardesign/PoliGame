@@ -210,6 +210,10 @@ export function makeEffects(scene, track, karts, reduced) {
       ring(p.clone().setY(p.y + 0.6), '#ffffff');
       if (r.player && !reduced) shake = Math.max(shake, 0.2);
     }
+    if (e.type === 'wall') {
+      burst(p.clone().add(new T.Vector3(0, -0.6, 0)), '#ffd28a', 14);
+      if (r.player && !reduced) shake = Math.max(shake, 0.12);
+    }
     if (e.type === 'hit') {
       burst(p, '#ff895f', 30);
       ring(p, '#ffb87c');
