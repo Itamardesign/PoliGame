@@ -1,121 +1,1145 @@
 import * as THREE from './vendor/three.module.min.js';
-import {DURATION,newRun,collect,tick,randomSeed,dayKey,hash,courseRow,phase,pace,useSpin,score,challengeFromSearch,challengeURL,RULESET} from './model.js';
-const $=id=>document.getElementById(id);
-const text={en:{edition:'THE UNOFFICIAL ELECTION GAME',arcade:'A VERY UNSTABLE ARCADE GAME',best:'PERSONAL BEST',seatsSmall:'SEATS',road:'ROAD TO 61',title1:'Big promises.',title2:'Tiny bus.',intro:'Collect seats. Dodge scandals.<br>Keep this coalition on the road.',play:'LET’S FORM A GOVERNMENT',daily:'Daily chaos',sameCourse:'Same road. Everyone.',quick:'61 seconds · No sign-up · Questionable stability',yourRide:'YOUR CAMPAIGN. YOUR PROBLEM.',need:'ALL YOU NEED IS',and:'…AND A LITTLE LUCK.',coalition:'YOUR COALITION',shield:'FALAFEL SHIELD ACTIVE',steer:'← → to steer · Collect the blue seats!',recess:'PARLIAMENTARY RECESS',paused:'Coalition on hold.',pauseCopy:'Even democracy needs a coffee break.',resume:'BACK TO THE CHAOS →',quit:'End run & return home',seatsWon:'SEATS ON BOARD',peak:'PEAK SEATS',scandals:'SCANDALS',held:'MAJORITY HELD',again:'ONE MORE ELECTION ↻',share:'Challenge the group chat',home:'Back to the campaign HQ',world:'01 / THE ROAD TO THE KNESSET',real3d:'SMALL BUS. BIG COALITION ENERGY.',howHeading:'POLITICS IS HARD.',playing:'PLAYING ISN’T.',moveTitle:'Make your move',moveCopy:'Swipe or use arrow keys',collectTitle:'Take a seat. Or 61.',collectCopy:'Blue chairs = coalition power',dodgeTitle:'Avoid a PR disaster',dodgeCopy:'Red barriers = very bad news',footer:'Made for the group chat. Not the campaign trail.',about:'A little context ↗',satire:'100% SATIRE. 0% PARTY AFFILIATION.'},he:{edition:'משחק הבחירות הלא רשמי',arcade:'משחק ארקייד מאוד לא יציב',best:'השיא שלך',seatsSmall:'מנדטים',road:'הדרך ל־61',title1:'הבטחות גדולות.',title2:'אוטובוס קטן.',intro:'אוספים מנדטים. מתחמקים משערוריות.<br>ומנסים להשאיר את הקואליציה על הכביש.',play:'יאללה, מקימים ממשלה',daily:'הכאוס היומי',sameCourse:'אותו מסלול. לכולם.',quick:'61 שניות · בלי הרשמה · יציבות בסימן שאלה',yourRide:'הקמפיין שלך. הבעיה שלך.',need:'כל מה שצריך זה',and:'…וקצת מזל.',coalition:'הקואליציה שלך',shield:'מגן הפלאפל פעיל',steer:'חצים או החלקה כדי לזוז · אספו כיסאות כחולים!',recess:'פגרת הכנסת',paused:'הקואליציה בהמתנה.',pauseCopy:'גם הדמוקרטיה צריכה הפסקת קפה.',resume:'חוזרים לבלגן ←',quit:'סיום הסיבוב וחזרה הביתה',seatsWon:'מנדטים על הסיפון',peak:'שיא מנדטים',scandals:'שערוריות',held:'זמן עם רוב',again:'עוד מערכת בחירות ↻',share:'אתגרו את קבוצת הוואטסאפ',home:'חזרה למטה הקמפיין',world:'01 / בדרך לכנסת',real3d:'אוטובוס קטן. אנרגיה של קואליציה.',howHeading:'פוליטיקה זה מסובך.',playing:'לשחק זה פשוט.',moveTitle:'תבחרו כיוון',moveCopy:'החליקו או השתמשו בחצים',collectTitle:'תפסו כיסא. או 61.',collectCopy:'כיסאות כחולים = כוח קואליציוני',dodgeTitle:'בלי משבר תקשורתי',dodgeCopy:'מחסומים אדומים = חדשות רעות',footer:'נוצר בשביל הקבוצה. לא בשביל הקמפיין.',about:'קצת הקשר ↗',satire:'100% סאטירה. 0% שיוך מפלגתי.'}};
-Object.assign(text.en,{road:'CHAOS EDITION / NO SAFE SEATS',title1:'Got 61?',title2:'Now survive.',intro:'Three scandals. You’re out.<br>Reach 61. Watch your partners defect.',play:'I CAN FIX THIS COUNTRY',quick:'61 seconds · 3 scandals · One spectacular collapse',arcade:'CHAOS EDITION — TRUST ABSOLUTELY NOBODY',seatsSmall:'PTS',seatsWon:'CHAOS POINTS',peak:'SEATS LEFT',held:'BEST STREAK',again:'SAME ROAD. PERSONAL REVENGE. ↻',share:'Dare the group chat to beat this',steer:'← → steer · SPACE = emergency spin · Esc = pause',dodgeCopy:'3 scandals = government dissolved',collectCopy:'Blue +3 · Gold +9, but +1 scandal',playing:'SURVIVING IS HARDER.',titleBadge:'NO CONFIDENCE',horn:'SPIN!',challenge:'FRIEND’S SCORE',ruleLine:'Gold deal: +9 seats / +1 scandal. Third scandal ends the run.'});
-Object.assign(text.he,{road:'גרסת הכאוס / אין כיסא בטוח',title1:'הגעת ל־61?',title2:'עכשיו תשרוד.',intro:'שלוש שערוריות. ואתה בחוץ.<br>השגת רוב? השותפים מתחילים לערוק.',play:'אני אתקן את המדינה הזאת',quick:'61 שניות · 3 שערוריות · התרסקות מפוארת אחת',arcade:'גרסת הכאוס — אל תסמכו על אף אחד',seatsSmall:'נק׳',seatsWon:'נקודות כאוס',peak:'מנדטים בסוף',held:'רצף שיא',again:'אותו כביש. נקמה אישית. ↻',share:'נראה את הקבוצה שלכם שורדת את זה',steer:'חצים לזוז · רווח = ספין חירום · Esc = השהיה',dodgeCopy:'3 שערוריות = הממשלה מתפזרת',collectCopy:'כחול: 3+ · זהב: 9+ ושערורייה',playing:'לשרוד זה כבר סיפור.',titleBadge:'אי־אמון',horn:'ספין!',challenge:'השיא של החבר',ruleLine:'דיל זהב: 9+ מנדטים / שערורייה 1+. בשלישית אתם בחוץ.'});
-text.en.fresh='New random road';text.he.fresh='כביש חדש, תירוץ חדש';text.en.need='REACH 61. THEN';text.he.need='הגעתם ל־61?';text.en.and='TRY NOT TO GET FIRED.';text.he.and='עכשיו אל תתפזרו.';$('fresh').querySelector('span').dataset.i18n='fresh';
-const incoming=challengeFromSearch(location.search);
-function read(key,fallback){try{return localStorage.getItem(key)||fallback;}catch{return fallback;}}
-function save(key,value){try{localStorage.setItem(key,String(value));}catch{}}
-let lang=read('cc-lang',navigator.language.startsWith('he')?'he':'en');if(!text[lang])lang='en';
-let best=Number(read('cc-best-v2','0')),sound=read('cc-sound','off')==='on';
-const tr=(en,he)=>lang==='he'?he:en;
-function translate(){document.documentElement.lang=lang;document.querySelectorAll('[data-i18n]').forEach(el=>{const value=text[lang][el.dataset.i18n];if(el.dataset.i18n==='intro')el.innerHTML=value;else el.textContent=value;});$('language').innerHTML=lang==='en'?'עברית <span>↔</span>':'English <span>↔</span>';$('language').setAttribute('aria-label',lang==='en'?'Switch to Hebrew':'Switch to English');$('best').textContent=best||'—';$('game').setAttribute('aria-label',tr('Campaign bus. Steer with arrows, A/D or swipe.','אוטובוס הקמפיין. השתמשו בחצים או החליקו כדי לזוז.'));}
+import {
+  DURATION,
+  newRun,
+  collect,
+  tick,
+  randomSeed,
+  dayKey,
+  hash,
+  courseRow,
+  phase,
+  pace,
+  useSpin,
+  score,
+  challengeFromSearch,
+  challengeURL,
+  RULESET
+} from './model.js';
+const $ = id => document.getElementById(id);
+const text = {
+  en: {
+    edition: 'THE UNOFFICIAL ELECTION GAME',
+    arcade: 'A VERY UNSTABLE ARCADE GAME',
+    best: 'PERSONAL BEST',
+    seatsSmall: 'SEATS',
+    road: 'ROAD TO 61',
+    title1: 'Big promises.',
+    title2: 'Tiny bus.',
+    intro: 'Collect seats. Dodge scandals.<br>Keep this coalition on the road.',
+    play: 'LET’S FORM A GOVERNMENT',
+    daily: 'Daily chaos',
+    sameCourse: 'Same road. Everyone.',
+    quick: '61 seconds · No sign-up · Questionable stability',
+    yourRide: 'YOUR CAMPAIGN. YOUR PROBLEM.',
+    need: 'ALL YOU NEED IS',
+    and: '…AND A LITTLE LUCK.',
+    coalition: 'YOUR COALITION',
+    shield: 'FALAFEL SHIELD ACTIVE',
+    steer: '← → to steer · Collect the blue seats!',
+    recess: 'PARLIAMENTARY RECESS',
+    paused: 'Coalition on hold.',
+    pauseCopy: 'Even democracy needs a coffee break.',
+    resume: 'BACK TO THE CHAOS →',
+    quit: 'End run & return home',
+    seatsWon: 'SEATS ON BOARD',
+    peak: 'PEAK SEATS',
+    scandals: 'SCANDALS',
+    held: 'MAJORITY HELD',
+    again: 'ONE MORE ELECTION ↻',
+    share: 'Challenge the group chat',
+    home: 'Back to the campaign HQ',
+    world: '01 / THE ROAD TO THE KNESSET',
+    real3d: 'SMALL BUS. BIG COALITION ENERGY.',
+    howHeading: 'POLITICS IS HARD.',
+    playing: 'PLAYING ISN’T.',
+    moveTitle: 'Make your move',
+    moveCopy: 'Swipe or use arrow keys',
+    collectTitle: 'Take a seat. Or 61.',
+    collectCopy: 'Blue chairs = coalition power',
+    dodgeTitle: 'Avoid a PR disaster',
+    dodgeCopy: 'Red barriers = very bad news',
+    footer: 'Made for the group chat. Not the campaign trail.',
+    about: 'A little context ↗',
+    satire: '100% SATIRE. 0% PARTY AFFILIATION.'
+  },
+  he: {
+    edition: 'משחק הבחירות הלא רשמי',
+    arcade: 'משחק ארקייד מאוד לא יציב',
+    best: 'השיא שלך',
+    seatsSmall: 'מנדטים',
+    road: 'הדרך ל־61',
+    title1: 'הבטחות גדולות.',
+    title2: 'אוטובוס קטן.',
+    intro: 'אוספים מנדטים. מתחמקים משערוריות.<br>ומנסים להשאיר את הקואליציה על הכביש.',
+    play: 'יאללה, מקימים ממשלה',
+    daily: 'הכאוס היומי',
+    sameCourse: 'אותו מסלול. לכולם.',
+    quick: '61 שניות · בלי הרשמה · יציבות בסימן שאלה',
+    yourRide: 'הקמפיין שלך. הבעיה שלך.',
+    need: 'כל מה שצריך זה',
+    and: '…וקצת מזל.',
+    coalition: 'הקואליציה שלך',
+    shield: 'מגן הפלאפל פעיל',
+    steer: 'חצים או החלקה כדי לזוז · אספו כיסאות כחולים!',
+    recess: 'פגרת הכנסת',
+    paused: 'הקואליציה בהמתנה.',
+    pauseCopy: 'גם הדמוקרטיה צריכה הפסקת קפה.',
+    resume: 'חוזרים לבלגן ←',
+    quit: 'סיום הסיבוב וחזרה הביתה',
+    seatsWon: 'מנדטים על הסיפון',
+    peak: 'שיא מנדטים',
+    scandals: 'שערוריות',
+    held: 'זמן עם רוב',
+    again: 'עוד מערכת בחירות ↻',
+    share: 'אתגרו את קבוצת הוואטסאפ',
+    home: 'חזרה למטה הקמפיין',
+    world: '01 / בדרך לכנסת',
+    real3d: 'אוטובוס קטן. אנרגיה של קואליציה.',
+    howHeading: 'פוליטיקה זה מסובך.',
+    playing: 'לשחק זה פשוט.',
+    moveTitle: 'תבחרו כיוון',
+    moveCopy: 'החליקו או השתמשו בחצים',
+    collectTitle: 'תפסו כיסא. או 61.',
+    collectCopy: 'כיסאות כחולים = כוח קואליציוני',
+    dodgeTitle: 'בלי משבר תקשורתי',
+    dodgeCopy: 'מחסומים אדומים = חדשות רעות',
+    footer: 'נוצר בשביל הקבוצה. לא בשביל הקמפיין.',
+    about: 'קצת הקשר ↗',
+    satire: '100% סאטירה. 0% שיוך מפלגתי.'
+  }
+};
+Object.assign(text.en, {
+  road: 'CHAOS EDITION / NO SAFE SEATS',
+  title1: 'Got 61?',
+  title2: 'Now survive.',
+  intro: 'Three scandals. You’re out.<br>Reach 61. Watch your partners defect.',
+  play: 'I CAN FIX THIS COUNTRY',
+  quick: '61 seconds · 3 scandals · One spectacular collapse',
+  arcade: 'CHAOS EDITION — TRUST ABSOLUTELY NOBODY',
+  seatsSmall: 'PTS',
+  seatsWon: 'CHAOS POINTS',
+  peak: 'SEATS LEFT',
+  held: 'BEST STREAK',
+  again: 'SAME ROAD. PERSONAL REVENGE. ↻',
+  share: 'Dare the group chat to beat this',
+  steer: '← → steer · SPACE = emergency spin · Esc = pause',
+  dodgeCopy: '3 scandals = government dissolved',
+  collectCopy: 'Blue +3 · Gold +9, but +1 scandal',
+  playing: 'SURVIVING IS HARDER.',
+  titleBadge: 'NO CONFIDENCE',
+  horn: 'SPIN!',
+  challenge: 'FRIEND’S SCORE',
+  ruleLine: 'Gold deal: +9 seats / +1 scandal. Third scandal ends the run.'
+});
+Object.assign(text.he, {
+  road: 'גרסת הכאוס / אין כיסא בטוח',
+  title1: 'הגעת ל־61?',
+  title2: 'עכשיו תשרוד.',
+  intro: 'שלוש שערוריות. ואתה בחוץ.<br>השגת רוב? השותפים מתחילים לערוק.',
+  play: 'אני אתקן את המדינה הזאת',
+  quick: '61 שניות · 3 שערוריות · התרסקות מפוארת אחת',
+  arcade: 'גרסת הכאוס — אל תסמכו על אף אחד',
+  seatsSmall: 'נק׳',
+  seatsWon: 'נקודות כאוס',
+  peak: 'מנדטים בסוף',
+  held: 'רצף שיא',
+  again: 'אותו כביש. נקמה אישית. ↻',
+  share: 'נראה את הקבוצה שלכם שורדת את זה',
+  steer: 'חצים לזוז · רווח = ספין חירום · Esc = השהיה',
+  dodgeCopy: '3 שערוריות = הממשלה מתפזרת',
+  collectCopy: 'כחול: 3+ · זהב: 9+ ושערורייה',
+  playing: 'לשרוד זה כבר סיפור.',
+  titleBadge: 'אי־אמון',
+  horn: 'ספין!',
+  challenge: 'השיא של החבר',
+  ruleLine: 'דיל זהב: 9+ מנדטים / שערורייה 1+. בשלישית אתם בחוץ.'
+});
+text.en.fresh = 'New random road';
+text.he.fresh = 'כביש חדש, תירוץ חדש';
+text.en.need = 'REACH 61. THEN';
+text.he.need = 'הגעתם ל־61?';
+text.en.and = 'TRY NOT TO GET FIRED.';
+text.he.and = 'עכשיו אל תתפזרו.';
+$('fresh').querySelector('span').dataset.i18n = 'fresh';
+const incoming = challengeFromSearch(location.search);
+function read(key, fallback) {
+  try {
+    return localStorage.getItem(key) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+function save(key, value) {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {}
+}
+let lang = read('cc-lang', navigator.language.startsWith('he') ? 'he' : 'en');
+if (!text[lang]) lang = 'en';
+let best = Number(read('cc-best-v2', '0')),
+  sound = read('cc-sound', 'off') === 'on';
+const tr = (en, he) => (lang === 'he' ? he : en);
+function translate() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const value = text[lang][el.dataset.i18n];
+    if (el.dataset.i18n === 'intro') el.innerHTML = value;
+    else el.textContent = value;
+  });
+  $('language').innerHTML = lang === 'en' ? 'עברית <span>↔</span>' : 'English <span>↔</span>';
+  $('language').setAttribute('aria-label', lang === 'en' ? 'Switch to Hebrew' : 'Switch to English');
+  $('best').textContent = best || '—';
+  $('game').setAttribute(
+    'aria-label',
+    tr('Campaign bus. Steer with arrows, A/D or swipe.', 'אוטובוס הקמפיין. השתמשו בחצים או החליקו כדי לזוז.')
+  );
+}
 translate();
 let audioCtx;
-function tone(freq=440,duration=.1,type='sine',volume=.06){if(!sound)return;try{audioCtx??=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,audioCtx.currentTime);osc.frequency.exponentialRampToValueAtTime(freq*.65,audioCtx.currentTime+duration);gain.gain.setValueAtTime(volume,audioCtx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+duration);osc.connect(gain);gain.connect(audioCtx.destination);osc.start();osc.stop(audioCtx.currentTime+duration);}catch{}}
-function setSound(){ $('sound').setAttribute('aria-pressed',String(sound));$('sound').setAttribute('aria-label',sound?'Turn sound off':'Turn sound on');$('sound').innerHTML=sound?'♪':'♪<span class="sound-slash">/</span>';save('cc-sound',sound?'on':'off');}setSound();
-const canvas=$('game'),arena=$('arena');let renderer;
-try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});}catch(e){$('loading').classList.add('hidden');$('error').classList.remove('hidden');throw e;}
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setClearColor('#c5e5d7');
-const scene=new THREE.Scene();scene.background=new THREE.Color('#c5e5d7');scene.fog=new THREE.Fog('#c5e5d7',45,130);
-const camera=new THREE.PerspectiveCamera(40,1,.1,180);scene.add(new THREE.HemisphereLight('#fff9dc','#70988e',2.6));const sun=new THREE.DirectionalLight('#fff2cc',3.2);sun.position.set(-18,32,20);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-28,right:28,top:35,bottom:-50,far:100});sun.shadow.normalBias=.04;scene.add(sun);
-const mats={};function mat(color){return mats[color]??=new THREE.MeshStandardMaterial({color,roughness:.82});}
-function box(w,h,d,color,x=0,y=0,z=0,parent=scene){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
-function cylinder(r1,r2,h,color,x,y,z,parent=scene,n=10){const m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,n),mat(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
-function label(value,w,h,bg='#f8edcb',fg='#203831',size=65){const c=document.createElement('canvas');c.width=512;c.height=256;const ctx=c.getContext('2d');ctx.fillStyle=bg;ctx.fillRect(0,0,512,256);ctx.fillStyle=fg;ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`900 ${size}px Arial`;ctx.fillText(value,256,130,470);const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));return m;}
-box(180,.5,220,'#afd0b4',0,-.36,-45);
-const road=box(10,.15,190,'#829a8e',0,-.01,-63);box(.5,.3,190,'#f7eccd',-5.3,.08,-63);box(.5,.3,190,'#f7eccd',5.3,.08,-63);
-const laneMarks=[];for(let z=-135;z<26;z+=5){for(const x of [-1.65,1.65])laneMarks.push(box(.09,.02,2.1,'#e7ebce',x,.08,z));}
-const scenery=[];const worldRng=randomSeed(2026);
-function tree(x,z){const g=new THREE.Group();scene.add(g);g.position.set(x,0,z);cylinder(.12,.19,1.4,'#8e8161',0,.7,0,g);const m=new THREE.Mesh(new THREE.IcosahedronGeometry(.95,0),mat('#66946e'));m.position.y=1.95;m.scale.set(.8,1.35,.8);m.castShadow=true;g.add(m);scenery.push(g);return g;}
-function building(x,z,h=5){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);box(4.8,h,4,'#e8dfbb',0,h/2,0,g);box(5.1,.22,4.3,'#f2eacb',0,h+.1,0,g);for(let y=1;y<h-.5;y+=1.6){for(const wx of [-1.5,0,1.5])box(.58,.88,.05,'#789189',wx,y,2.03,g);}box(1.1,1.7,.06,'#567972',0,.9,2.04,g);scenery.push(g);return g;}
-for(let i=0;i<15;i++){const z=-i*9+5;tree(-7-worldRng()*2,z);tree(7+worldRng()*3,z-4);if(i%2===0){building(-13-worldRng()*3,z-4,3+worldRng()*4);building(13+worldRng()*4,z+3,3+worldRng()*6);}}
-const knesset=new THREE.Group();scene.add(knesset);knesset.position.set(0,0,-112);box(26,.5,11,'#dbd7b4',0,.4,0,knesset);box(22,5,7,'#c7c5a8',0,3,0,knesset);for(let x=-12;x<=12;x+=2)box(.72,6,1,'#f7efcd',x,3.5,4.2,knesset);box(27,.8,10,'#f9efcf',0,6.8,0,knesset);box(29,.4,12,'#e1d9b7',0,7.35,0,knesset);const knessetSign=label('הכנסת',5,1.4);knessetSign.position.set(0,6.4,5.02);knesset.add(knessetSign);
-const bus=new THREE.Group();scene.add(bus);bus.position.set(0,0,5);
-box(2.4,1.65,4.45,'#f5c649',0,1.38,0,bus);box(2.22,.65,3.9,'#ffdd72',0,2.38,-.06,bus);box(2.35,.18,4.26,'#ffe690',0,2.8,0,bus);box(2.3,.27,4.46,'#f1f0ce',0,.95,0,bus);box(1.96,.84,.05,'#365c5b',0,2.03,2.24,bus);box(1.96,.84,.05,'#365c5b',0,2.03,-2.24,bus);for(const x of [-1.21,1.21]){for(const z of [-1.34,-.23,.88])box(.035,.72,.89,'#4e7771',x,2.04,z,bus);box(.04,.68,.075,'#fbd567',x,2.04,1.35,bus);}box(2.5,.2,.2,'#e2e5cf',0,.6,2.25,bus);box(.33,.21,.08,'#dd6451',-.84,1.1,2.27,bus);box(.33,.21,.08,'#dd6451',.84,1.1,2.27,bus);box(.65,.2,.03,'#f4edce',0,.89,2.29,bus);const busTag=label('61',1.3,.68,'#fff6d4','#203831',125);busTag.position.set(0,1.45,2.275);bus.add(busTag);const busSide=label('יאללה!',1.8,.66,'#f5c649','#203831',90);busSide.rotation.y=Math.PI/2;busSide.position.set(1.225,1.3,-.3);bus.add(busSide);
-const wheels=[];for(const x of [-1.18,1.18])for(const z of [-1.35,1.35]){const w=cylinder(.48,.48,.3,'#283d38',x,.53,z,bus,16);w.rotation.z=Math.PI/2;wheels.push(w);const hub=cylinder(.21,.21,.32,'#c8d1bb',x,.53,z,bus,12);hub.rotation.z=Math.PI/2;}
-box(1.8,.17,2.25,'#617970',0,2.99,-.2,bus);box(1.4,.7,.8,'#ead7af',0,3.42,-.7,bus);box(.18,.73,.82,'#668375',0,3.42,-.7,bus);const megaphone=cylinder(.4,.18,.75,'#f5edd4',0,3.42,.8,bus);megaphone.rotation.x=Math.PI/2;const hole=cylinder(.28,.28,.02,'#455e52',0,3.42,1.185,bus);hole.rotation.x=Math.PI/2;
-const pole=box(.055,1.5,.055,'#e3e2c7',-.75,3.55,-1.3,bus);const flag=box(.75,.48,.025,'#f5f1df',-.38,4.08,-1.3,bus);box(.75,.06,.03,'#4e83ab',-.38,4.25,-1.28,bus);box(.75,.06,.03,'#4e83ab',-.38,3.91,-1.28,bus);const flagStar=label('✡',.24,.24,'#f5f1df','#4e83ab',160);flagStar.position.set(-.38,4.08,-1.275);bus.add(flagStar);
-const shieldMesh=new THREE.Mesh(new THREE.SphereGeometry(3.2,20,12),new THREE.MeshBasicMaterial({color:'#ffe56b',transparent:true,opacity:.15,wireframe:true}));shieldMesh.position.y=1.5;shieldMesh.visible=false;bus.add(shieldMesh);
-function chair(){const g=new THREE.Group();box(1.05,.24,1.03,'#4e89bf',0,1,0,g);box(1.05,1.12,.24,'#659fd0',0,1.66,-.42,g);for(const x of [-.4,.4])for(const z of [-.36,.36])box(.12,.7,.12,'#d5dbc8',x,.55,z,g);for(const x of [-.62,.62]){box(.18,.16,.86,'#326b9f',x,1.35,0,g);box(.1,.3,.1,'#4e7891',x,1.18,.27,g);}return g;}
-function obstacle(variant){const g=new THREE.Group();box(2.32,.95,.62,'#dd6847',0,.95,0,g);for(const x of [-.84,.84]){box(.17,1.3,.17,'#617269',x,.65,0,g);box(.54,.12,.9,'#617269',x,.12,0,g);}for(let x=-.85;x<=.85;x+=.57){const stripe=box(.26,.75,.015,'#fff2cf',x,.95,.32,g);stripe.rotation.z=-.35;}const sign=label(['SCANDAL','U-TURN','RECOUNT'][variant],1.8,.42,'#f9ebc9','#713622',68);sign.position.set(0,1.75,.2);g.add(sign);return g;}
-function falafel(){const g=new THREE.Group();const pita=new THREE.Mesh(new THREE.SphereGeometry(.65,12,8),mat('#f9d989'));pita.scale.set(1,.85,.5);pita.position.y=1.3;g.add(pita);for(let i=0;i<3;i++){const ball=new THREE.Mesh(new THREE.IcosahedronGeometry(.27,1),mat('#9b7843'));ball.position.set((i-1)*.35,1.75,0);g.add(ball);}const ring=new THREE.Mesh(new THREE.TorusGeometry(.97,.035,6,24),mat('#ffef91'));ring.position.y=1.35;g.add(ring);return g;}
-function briefcase(){const g=new THREE.Group();box(1.5,.95,.55,'#edb937',0,1.2,0,g);box(.6,.16,.2,'#725123',0,1.83,0,g);box(.15,.9,.57,'#ffe6a0',0,1.2,0,g);const warning=label('+9 / +1 !',2.3,.62,'#fbd659','#762d26',85);warning.position.set(0,2.15,.25);g.add(warning);return g;}
-const templates={seat:chair(),shield:falafel(),deal:briefcase(),hazard0:obstacle(0),hazard1:obstacle(1),hazard2:obstacle(2)};
-let items=[],particles=[];function addItem(type,lane,z,variant=0){const g=templates[type==='hazard'?'hazard'+variant:type].clone(true);g.position.set((lane-1)*3.2,0,z);scene.add(g);const item={type,lane,z,mesh:g,variant,passed:false};items.push(item);return item;}
-function clearItems(){items.forEach(i=>scene.remove(i.mesh));items=[];particles.forEach(p=>scene.remove(p.mesh));particles=[];}
-function demoItems(){clearItems();addItem('seat',0,-4);addItem('seat',0,-12);addItem('seat',1,-21);addItem('hazard',2,-12,0);addItem('shield',2,-3);addItem('seat',2,-29);addItem('hazard',0,-35,1);}
-demoItems();
-const particleGeo=new THREE.BoxGeometry(.12,.24,.08);function burst(color,count=16){if(reducedMotion)return;for(let i=0;i<count;i++){const m=new THREE.Mesh(particleGeo,mat(color));m.position.copy(bus.position).add(new THREE.Vector3((Math.random()-.5)*2,2,0));scene.add(m);particles.push({mesh:m,v:new THREE.Vector3((Math.random()-.5)*6,4+Math.random()*5,(Math.random()-.5)*6),life:.7+Math.random()*.5});}}
-let lastPhase=-1,lastSeed=null,spinPulse=0,resultRoast='';
-let state='home',run=newRun(0),mode='quick',lane=1,rng=randomSeed(1),spawnClock=0,rowIndex=0,countTime=0,toastTime=0,hitFlash=0,elapsed=0,last=0,menuBlend=1,animId,challengeTarget=0;
-const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-let mobile=innerWidth<=700;
-function resize(){mobile=innerWidth<=700;const r=arena.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}new ResizeObserver(resize).observe(arena);resize();
-function showToast(message,kind='good'){const el=$('toast');el.textContent=message;el.className='toast visible '+kind;toastTime=2.5;}
-function updateHud(){
- $('seats').textContent=run.seats;$('timer').innerHTML=Math.ceil(DURATION-run.time)+'<span>s</span>';
- $('seatFill').style.width=(run.seats/120*100)+'%';$('seatFill').style.background=run.seats>=61?'#5b976d':'#437aaf';$('shield').classList.toggle('hidden',!run.shield);shieldMesh.visible=run.shield;
- $('strikes').textContent='✕'.repeat(run.hits)+'○'.repeat(Math.max(0,3-run.hits));$('strikes').setAttribute('aria-label',tr(run.hits+' of 3 scandals',run.hits+' מתוך 3 שערוריות'));
- $('combo').textContent=tr('STREAK ','רצף ')+run.combo;
- $('horn').disabled=run.spinCooldown>0||state!=='running';$('horn').textContent=run.spinCooldown>0?Math.ceil(run.spinCooldown)+'s':tr('SPIN!','ספין!');
- $('liveScore').textContent=score(run).toLocaleString();
- $('defection').classList.toggle('hidden',!run.formed);$('defection').textContent=tr('PARTNERS DEFECT IN ','עריקה בעוד ')+Math.ceil(run.defectIn)+tr('s · −4 SEATS',' שנ׳ · 4− מנדטים');
- $('challengeHud').classList.toggle('hidden',!incoming||mode!=='challenge');if(incoming)$('challengeHud').textContent=tr('BEAT ','לעבור את ')+incoming.score.toLocaleString()+tr(' PTS',' נק׳');
+function tone(freq = 440, duration = 0.1, type = 'sine', volume = 0.06) {
+  if (!sound) return;
+  try {
+    audioCtx ??= new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator(),
+      gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.65, audioCtx.currentTime + duration);
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch {}
 }
-function start(which='quick',replay=false){mode=which;const seed=replay&&lastSeed!==null?lastSeed:mode==='challenge'&&incoming?incoming.seed:mode==='daily'?hash(RULESET+dayKey()):crypto.getRandomValues(new Uint32Array(1))[0];lastSeed=seed;lastPhase=-1;spinPulse=0;run=newRun(seed);rng=randomSeed(seed);lane=1;bus.position.x=0;bus.rotation.set(0,0,0);spawnClock=0;rowIndex=0;countTime=2.5;hitFlash=0;state='countdown';clearItems();$('home').classList.add('hidden');$('results').classList.add('hidden');$('pauseOverlay').classList.add('hidden');$('hud').classList.remove('hidden');$('countdown').classList.remove('hidden');$('touchControls').classList.remove('hidden');$('gameHint').classList.remove('hidden');$('modeLabel').textContent=mode==='challenge'?tr('GROUP CHAT DUEL','דו־קרב קבוצתי'):mode==='daily'?tr('DAILY CHAOS','כאוס יומי'):tr('CHAOS RUN','סיבוב כאוס');$('chaosStatus').classList.remove('hidden');$('challengeBanner').classList.add('hidden');arena.classList.remove('boss');arena.classList.add('playing');$('toast').classList.remove('visible');updateHud();canvas.focus({preventScroll:true});tone(330,.12);}
-function goHome(){state='home';['results','pauseOverlay','hud','touchControls','countdown','gameHint','chaosStatus','defection'].forEach(id=>$(id).classList.add('hidden'));$('home').classList.remove('hidden');$('toast').classList.remove('visible');arena.classList.remove('playing','boss');if(incoming)$('challengeBanner').classList.remove('hidden');shieldMesh.visible=false;lane=1;demoItems();$('play').focus({preventScroll:true});}
-function steer(dir){if(state!=='running'&&state!=='countdown')return;const next=Math.max(0,Math.min(2,lane+dir));if(next!==lane){lane=next;tone(130+lane*40,.05,'sine',.025);}}
-function pause(){if(state!=='running')return;state='paused';$('pauseOverlay').classList.remove('hidden');$('resume').focus({preventScroll:true});}
-function resume(){if(state!=='paused')return;state='running';$('pauseOverlay').classList.add('hidden');canvas.focus({preventScroll:true});}
-const jokes={en:['You promised free parking. In Tel Aviv. −12.','You sent the voice note to the WRONG group. −12.','Your partner wants Minister of Everything. −12.'],he:['הבטחת חניה חינם. בתל אביב. 12− מנדטים.','שלחת את ההקלטה לקבוצה הלא נכונה. 12− מנדטים.','השותף דורש להיות שר הכל. 12− מנדטים.']};
-function announceMajority(){showToast(tr('61! CONGRATS. YOUR PARTNERS NOW HATE YOU.','61! מזל טוב. עכשיו השותפים שונאים אותך.'));burst('#fbd659',45);tone(880,.3);}
-function spin(){if(state!=='running'||run.spinCooldown>0)return;const threats=items.filter(i=>i.type==='hazard'&&!i.passed&&i.mesh.position.z>-27&&i.mesh.position.z<3);if(!threats.length){showToast(tr('Save the spin. No scandals in range.','שמור את הספין. אין שערוריות בטווח.'));return;}if(!useSpin(run))return;for(const i of threats){i.passed=true;i.mesh.visible=false;}spinPulse=.8;showToast(tr('BREAKING: LOOK! SOMETHING ELSE!','מבזק: תראו! משהו אחר!'));tone(180,.25,'sawtooth',.04);burst('#fbd659',30);updateHud();}
-function hit(item){const outcome=collect(run,item.type);
- if(outcome.kind==='formed')announceMajority();
- else if(outcome.kind==='seat'){if(outcome.combo%5===0)showToast(tr('COMBO! +6. Everyone suddenly loves you.','קומבו! 6+. פתאום כולם אוהבים אותך.'));burst('#70b4e5',9);tone(450+outcome.combo%5*90,.10);}
- else if(outcome.kind==='deal'){showToast(tr('DIRTY DEAL: +9 SEATS. +1 SCANDAL. WORTH IT?','דיל מסריח: 9+ מנדטים. שערורייה 1+. היה שווה?'),'bad');tone(240,.22);burst('#fbd659');if(outcome.formed)announceMajority();}
- else if(outcome.kind==='shield'){showToast(tr('Falafel immunity. Legally delicious.','חסינות פלאפל. טעים וחוקי.'));tone(730,.18);burst('#fbd659');}
- else if(outcome.kind==='saved'){showToast(tr('Your legal team is three falafel balls. It worked.','הצוות המשפטי שלך הוא שלושה כדורי פלאפל. זה עבד.'));tone(540,.2);burst('#fbd659');}
- else if(outcome.kind==='hit'){showToast(jokes[lang][item.variant],'bad');hitFlash=.5;tone(110,.3,'sawtooth',.04);burst('#dc684c');if(navigator.vibrate)navigator.vibrate(35);}
- updateHud();if(run.ended)finish();
+function setSound() {
+  $('sound').setAttribute('aria-pressed', String(sound));
+  $('sound').setAttribute('aria-label', sound ? 'Turn sound off' : 'Turn sound on');
+  $('sound').innerHTML = sound ? '♪' : '♪<span class="sound-slash">/</span>';
+  save('cc-sound', sound ? 'on' : 'off');
 }
-function roast(){if(run.reason==='won')return tr('You survived the coalition. The family WhatsApp is next.','שרדת קואליציה. עכשיו נסה לשרוד את הוואטסאפ המשפחתי.');if(run.deals>=2)return tr('You sold your principles. Forgot to ask for a receipt.','מכרת את העקרונות. שכחת לבקש חשבונית.');if(run.peak>=61)return tr('Your government lasted less than a voice note from your aunt.','הממשלה שלך החזיקה פחות מהודעה קולית של דודה שלך.');if(run.time<20)return tr('The lettuce in your fridge has a longer political career.','לחסה במקרר שלך יש קריירה פוליטית ארוכה יותר.');if(run.seats===60)return tr('60 seats. Even your imaginary friend abstained.','60 מנדטים. אפילו החבר הדמיוני שלך נמנע.');return tr('You couldn’t form a coalition in a group chat of three.','לא הצלחת להקים קואליציה אפילו בקבוצה של שלושה.');}
-function finish(){state='results';run.ended=true;const won=run.reason==='won';const points=score(run);const newBest=points>best;if(newBest){best=points;save('cc-best-v2',best);$('best').textContent=best.toLocaleString();}
- ['hud','touchControls','gameHint','chaosStatus','defection'].forEach(id=>$(id).classList.add('hidden'));$('toast').classList.remove('visible');$('results').classList.remove('hidden');arena.classList.remove('boss');
- $('resultEyebrow').textContent=newBest?tr('NEW BEST. LOW BAR. BUT STILL.','שיא חדש. רף נמוך. אבל עדיין.'):tr('OFFICIAL CERTIFICATE OF CHAOS','תעודת כאוס רשמית');
- $('resultTitle').textContent=won?tr('Somehow. A government.','איכשהו. יש ממשלה.'):run.reason==='scandals'?tr('3 scandals. You’re fired.','3 שערוריות. הביתה.'):run.peak>=61?tr('61. Then betrayal.','61. ואז בגידה.'):tr('Prime Minister of Nothing.','ראש ממשלת כלום.');
- resultRoast=roast();$('resultJoke').textContent=resultRoast;$('resultSeats').textContent=points.toLocaleString();$('resultBest').textContent=run.seats;$('resultHits').textContent=run.hits+'/3';$('resultTime').textContent=run.maxCombo+'×';
- $('resultStamp').textContent=won?tr('SURVIVED','שרדתי'):tr('DISSOLVED','התפזרתי');$('resultStamp').classList.toggle('win',won);
- $('duelResult').textContent=incoming&&mode==='challenge'?points>incoming.score?tr('YOU BEAT YOUR FRIEND BY ','ניצחת את החבר ב־')+(points-incoming.score)+tr(' POINTS. SEND THE RECEIPT.',' נקודות. שלח לו הוכחה.'):points===incoming.score?tr('A TIE. DEMAND A RECOUNT.','תיקו. לדרוש ספירה חוזרת.'):tr('YOUR FRIEND IS AHEAD BY ','החבר מוביל ב־')+(incoming.score-points)+tr(' POINTS. REVENGE?',' נקודות. נקמה?'):tr('Your friend gets this exact road. No excuses.','החבר יקבל בדיוק את אותו הכביש. בלי תירוצים.');
- $('share').querySelector('[data-i18n]').textContent=text[lang].share;$('again').focus({preventScroll:true});tone(won?880:160,.4);if(won)burst('#fbd659',65);
+setSound();
+const canvas = $('game'),
+  arena = $('arena');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+} catch (e) {
+  $('loading').classList.add('hidden');
+  $('error').classList.remove('hidden');
+  throw e;
 }
-const calmSky=new THREE.Color('#c5e5d7'),crisisSky=new THREE.Color('#d5b5a7');
-function update(dt){elapsed+=dt;scene.background.lerp(state==='running'&&phase(run.time)===3?crisisSky:calmSky,Math.min(1,dt*2));scene.fog.color.copy(scene.background);const playing=state==='running';const idle=state==='home';menuBlend=THREE.MathUtils.damp(menuBlend,idle?1:0,3.7,dt);const menuPos=mobile?new THREE.Vector3(18,21,28):new THREE.Vector3(23,21,30);const playPos=mobile?new THREE.Vector3(0,12,22):new THREE.Vector3(0,14,25);camera.position.copy(playPos.lerp(menuPos,menuBlend));const target=mobile?new THREE.Vector3(0,0,-6).lerp(new THREE.Vector3(-1,0,-1),menuBlend):new THREE.Vector3(0,0,-14).lerp(new THREE.Vector3(-8,0,-8),menuBlend);camera.lookAt(target);
-if(idle){bus.position.x=0;bus.rotation.y=-.1;bus.position.y=reducedMotion?0:Math.sin(elapsed*2)*.035;}
-if(state==='countdown'){countTime-=dt;$('countdown').textContent=countTime>.6?Math.ceil(countTime-.5):tr('GO!','יאללה!');if(countTime<=0){state='running';$('countdown').classList.add('hidden');tone(760,.16);}}
-if(playing){const events=tick(run,dt);if(events.defected){showToast(tr('4 PARTNERS LEFT THE CHAT. −4 SEATS.','4 שותפים עזבו את הקבוצה. 4− מנדטים.'),'bad');burst('#dc684c',8);tone(180,.13);}const stage=phase(run.time);if(stage!==lastPhase){lastPhase=stage;const headlines=[tr('01 / SMILE. THE CAMERAS ARE ON.','01 / לחייך. המצלמות עובדות.'),tr('02 / HOT MIC. COLD SWEAT.','02 / מיקרופון פתוח. זיעה קרה.'),tr('03 / EVERYONE WANTS YOUR CHAIR.','03 / כולם רוצים את הכיסא שלך.'),tr('04 / NO-CONFIDENCE VOTE. HOLD ON.','04 / הצבעת אי־אמון. להחזיק חזק.')];$('phaseLabel').textContent=headlines[stage];if(stage>0){showToast(headlines[stage],stage===3?'bad':'good');tone(170+stage*100,.3);}arena.classList.toggle('boss',stage===3);}bus.position.x=THREE.MathUtils.damp(bus.position.x,(lane-1)*3.2,15,dt);const tilt=THREE.MathUtils.clamp(((lane-1)*3.2-bus.position.x)*-.07,-.15,.15);bus.rotation.z=THREE.MathUtils.damp(bus.rotation.z,reducedMotion?0:tilt,12,dt);bus.rotation.y=THREE.MathUtils.damp(bus.rotation.y,0,10,dt);bus.position.y=reducedMotion?0:Math.sin(elapsed*20)*.018;const {speed,interval}=pace(run);laneMarks.forEach(m=>{m.position.z+=speed*dt;if(m.position.z>27)m.position.z-=165;});scenery.forEach(g=>{g.position.z+=speed*dt;if(g.position.z>24)g.position.z-=144;});wheels.forEach(w=>w.rotation.x-=speed*dt*1.3);spawnClock-=dt;if(spawnClock<=0){for(const spec of courseRow(rng,rowIndex,run.time))addItem(spec.type,spec.lane,-63,spec.variant);rowIndex++;spawnClock+=interval;}
-for(const item of items){item.mesh.position.z+=speed*dt;if(!item.passed&&item.mesh.position.z>=3){item.passed=true;if(Math.abs(item.mesh.position.x-bus.position.x)<1.35){item.mesh.visible=false;hit(item);if(state!=='running')break;}}}
-if(run.time>6)$('gameHint').classList.add('hidden');if(run.ended&&state==='running')finish();updateHud();}
-for(let i=items.length-1;i>=0;i--){const item=items[i];if(item.mesh.position.z>14){scene.remove(item.mesh);items.splice(i,1);}else if(item.type!=='hazard'&&state!=='paused'){item.mesh.rotation.y=Math.sin(elapsed*1.8+item.z)*.25;item.mesh.position.y=reducedMotion?0:Math.sin(elapsed*3+item.z)*.12;}}
-if(state!=='paused'){for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.life-=dt;p.v.y-=10*dt;p.mesh.position.addScaledVector(p.v,dt);p.mesh.rotation.x+=dt*5;p.mesh.rotation.z+=dt*4;if(p.life<=0){scene.remove(p.mesh);particles.splice(i,1);}}toastTime-=dt;if(toastTime<=0)$('toast').classList.remove('visible');spinPulse=Math.max(0,spinPulse-dt);arena.classList.toggle('spinning',spinPulse>0);hitFlash=Math.max(0,hitFlash-dt);bus.visible=hitFlash>0?Math.floor(hitFlash*20)%2===0:true;}renderer.render(scene,camera);}
-function frame(time){const dt=Math.min((time-last)/1000||0,.05);last=time;update(dt);animId=requestAnimationFrame(frame);}animId=requestAnimationFrame(frame);
-$('loading').classList.add('hidden');$('play').disabled=false;$('daily').disabled=false;
-$('play').onclick=()=>start(incoming?'challenge':'quick');$('daily').onclick=()=>start('daily');$('again').onclick=()=>start(mode,true);$('fresh').onclick=()=>start('quick');$('horn').onclick=spin;$('resultHome').onclick=goHome;$('quit').onclick=goHome;$('pause').onclick=pause;$('resume').onclick=resume;$('left').onpointerdown=e=>{e.preventDefault();steer(-1);};$('right').onpointerdown=e=>{e.preventDefault();steer(1);};$('language').onclick=()=>{lang=lang==='en'?'he':'en';save('cc-lang',lang);translate();};$('sound').onclick=()=>{sound=!sound;setSound();tone(620,.1);};
-let pointerStart=null;canvas.addEventListener('pointerdown',e=>{pointerStart={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);});canvas.addEventListener('pointermove',e=>{if(!pointerStart)return;const dx=e.clientX-pointerStart.x;if(Math.abs(dx)>24){steer(dx>0?1:-1);pointerStart={x:e.clientX,y:e.clientY};}});canvas.addEventListener('pointerup',()=>pointerStart=null);canvas.addEventListener('pointercancel',()=>pointerStart=null);
-document.addEventListener('keydown',e=>{if($('info').open)return;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' ','Escape','a','d','A','D','p','P'].includes(e.key)&&['running','countdown','paused'].includes(state)){e.preventDefault();if(e.repeat)return;if(e.key==='ArrowLeft'||e.key.toLowerCase()==='a')steer(-1);else if(e.key==='ArrowRight'||e.key.toLowerCase()==='d')steer(1);else if(e.key===' '&&state==='running')spin();else if(['Escape','p','P'].includes(e.key)){if(state==='paused')resume();else pause();}}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});window.addEventListener('blur',pause);
-canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();cancelAnimationFrame(animId);pause();$('error').classList.remove('hidden');$('errorText').textContent=tr('The graphics connection was interrupted. Reload to start a fresh run.','החיבור הגרפי הופסק. טענו מחדש כדי להתחיל סיבוב חדש.');});
-let returnFocus=null;function info(kind){pause();returnFocus=document.activeElement;if(kind==='help')$('infoContent').innerHTML=tr('<span class="eyebrow">A 61-SECOND CRASH COURSE</span><h2>How to run the country.<br>Well, the bus.</h2><ol><li><b>Steer between three lanes.</b> Swipe, tap the arrow buttons, or use ← → / A D.</li><li><b>Collect blue chairs.</b> Each adds 3 seats. Every fifth consecutive pickup adds 6!</li><li><b>Dodge red scandals.</b> They cost 12 seats and reset your streak. Three scandals end the run, even with 120 seats.</li><li><b>Grab a falafel shield.</b> It absorbs one scandal. Shields don’t stack.</li><li><b>Finish with 61+ seats.</b> You start with 24. After your first majority, four partners defect after six seconds, then every four seconds. Keep collecting! Zero seats ends it early.</li></ol><p><b>Gold briefcase:</b> +9 seats but +1 scandal, even with a shield. Risk it or dodge it!<br><b>Space / SPIN:</b> clears red barriers in front of you; 12-second cooldown. Esc / P pauses. Daily Chaos uses the same course for everyone, resetting at midnight in Jerusalem. Best scores stay on this device.</p>','<span class="eyebrow">קורס מזורז ב־61 שניות</span><h2>איך מנהלים מדינה.<br>כלומר, אוטובוס.</h2><ol><li><b>זזים בין שלושה נתיבים.</b> מחליקים, מקישים על החצים או משתמשים בחצי המקלדת.</li><li><b>אוספים כיסאות כחולים.</b> כל כיסא מוסיף 3 מנדטים. כל איסוף חמישי ברצף מוסיף 6!</li><li><b>מתחמקים משערוריות אדומות.</b> הן מורידות 12 מנדטים ומאפסות את הרצף. שלוש שערוריות מסיימות את הסיבוב, גם עם 120 מנדטים.</li><li><b>לוקחים מגן פלאפל.</b> הוא סופג שערורייה אחת. אי אפשר לצבור מגנים.</li><li><b>מסיימים עם 61 מנדטים לפחות.</b> מתחילים עם 24. אחרי הרוב הראשון, ארבעה שותפים עורקים כעבור שש שניות ואז כל ארבע שניות. ממשיכים לאסוף! אפס מנדטים מסיים את הסיבוב מוקדם.</li></ol><p><b>מזוודת זהב:</b> 9+ מנדטים אבל שערורייה 1+, גם עם מגן. לקחת או להתחמק?<br><b>רווח / ספין:</b> מנקה מחסומים אדומים קרובים; נטען במשך 12 שניות. Esc / P משהים. הכאוס היומי זהה לכולם ומתחדש בחצות לפי שעון ירושלים. השיאים נשמרים במכשיר הזה.</p>');else $('infoContent').innerHTML=tr('<span class="eyebrow">REAL MATH. RIDICULOUS BUS.</span><h2>Why 61?</h2><p>Israel’s Knesset has <b>120 seats</b>, so 61 is an absolute majority. Coalition-building is the inspiration for this game. Actual government formation follows parliamentary confidence procedures; this is an arcade simplification, not a civics simulator.</p><p>Parties need at least <b>3.25% of valid votes</b> to participate in seat allocation. Seats are distributed proportionally among qualifying lists.</p><p>We’re poking fun at political chaos, coalition bargaining, and election fatigue—not asking you to vote for anyone. The bus, scandals, bonuses, and results are fictional.</p><p><a href="https://main.knesset.gov.il/en/mk/pages/elections.aspx" target="_blank" rel="noopener noreferrer">Learn about elections on the Knesset website ↗</a></p>','<span class="eyebrow">חשבון אמיתי. אוטובוס מגוחך.</span><h2>למה 61?</h2><p>בכנסת יש <b>120 מושבים</b>, ולכן 61 הם רוב מוחלט. הרכבת קואליציה היא ההשראה למשחק. הקמת ממשלה כפופה להליכי אמון בכנסת; המשחק הוא פישוט ארקייד, לא סימולטור אזרחות.</p><p>רשימה צריכה לקבל לפחות <b>3.25% מהקולות הכשרים</b> כדי להשתתף בחלוקת המנדטים, המחולקים באופן יחסי בין הרשימות שעברו את אחוז החסימה.</p><p>אנחנו צוחקים על הבלגן הפוליטי, המיקוח הקואליציוני ועייפות הבחירות — בלי לבקש להצביע לאף אחד. האוטובוס, השערוריות והתוצאות בדיוניים.</p><p><a href="https://main.knesset.gov.il/mk/elections/Pages/default.aspx" target="_blank" rel="noopener noreferrer">על הבחירות באתר הכנסת ↗</a></p>');$('info').showModal();}
-$('help').onclick=()=>info('help');$('about').onclick=()=>info('about');$('closeInfo').onclick=()=>$('info').close();$('info').addEventListener('close',()=>returnFocus?.focus());$('info').addEventListener('click',e=>{const r=$('info').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)$('info').close();});
-$('share').onclick=async()=>{
- const shareBase=['localhost','127.0.0.1'].includes(location.hostname)?'https://coalition-chaos-road-to-61.itamarstaga.chatgpt.site/':location.href;const url=challengeURL(shareBase,run),points=score(run);
- const shareText=tr('🚌 COALITION CHAOS — '+points+' points\n','🚌 כאוס קואליציוני — '+points+' נקודות\n')+resultRoast+'\n'+tr('🪑 '+run.seats+' seats · 💥 '+run.hits+'/3 scandals · ⏱ '+Math.floor(run.time)+'s\nSame road. Beat me. No excuses.','🪑 '+run.seats+' מנדטים · 💥 '+run.hits+'/3 שערוריות · ⏱ '+Math.floor(run.time)+' שניות\nאותו כביש. בואו תעברו אותי. בלי תירוצים.');
- try{await navigator.clipboard.writeText(shareText+'\n'+url);$('share').querySelector('[data-i18n]').textContent=tr('Copied. Go start a group-chat war.','הועתק. יאללה, בלגן בקבוצה.');}
- catch{$('infoContent').replaceChildren();const h=document.createElement('h2');h.textContent=tr('Copy your challenge','העתיקו את האתגר');const textarea=document.createElement('textarea');textarea.value=shareText+'\n'+url;textarea.style.cssText='width:100%;height:180px;font:14px/1.5 sans-serif';textarea.readOnly=true;$('infoContent').append(h,textarea);$('info').showModal();textarea.select();}
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor('#c5e5d7');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#c5e5d7');
+scene.fog = new THREE.Fog('#c5e5d7', 45, 130);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 180);
+scene.add(new THREE.HemisphereLight('#fff9dc', '#70988e', 2.6));
+const sun = new THREE.DirectionalLight('#fff2cc', 3.2);
+sun.position.set(-18, 32, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -28, right: 28, top: 35, bottom: -50, far: 100 });
+sun.shadow.normalBias = 0.04;
+scene.add(sun);
+const mats = {};
+function mat(color) {
+  return (mats[color] ??= new THREE.MeshStandardMaterial({ color, roughness: 0.82 }));
+}
+function box(w, h, d, color, x = 0, y = 0, z = 0, parent = scene) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  parent.add(m);
+  return m;
+}
+function cylinder(r1, r2, h, color, x, y, z, parent = scene, n = 10) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, n), mat(color));
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  parent.add(m);
+  return m;
+}
+function label(value, w, h, bg = '#f8edcb', fg = '#203831', size = 65) {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 512, 256);
+  ctx.fillStyle = fg;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `900 ${size}px Arial`;
+  ctx.fillText(value, 256, 130, 470);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, h),
+    new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })
+  );
+  return m;
+}
+box(180, 0.5, 220, '#afd0b4', 0, -0.36, -45);
+const road = box(10, 0.15, 190, '#829a8e', 0, -0.01, -63);
+box(0.5, 0.3, 190, '#f7eccd', -5.3, 0.08, -63);
+box(0.5, 0.3, 190, '#f7eccd', 5.3, 0.08, -63);
+const laneMarks = [];
+for (let z = -135; z < 26; z += 5) {
+  for (const x of [-1.65, 1.65]) laneMarks.push(box(0.09, 0.02, 2.1, '#e7ebce', x, 0.08, z));
+}
+const scenery = [];
+const worldRng = randomSeed(2026);
+function tree(x, z) {
+  const g = new THREE.Group();
+  scene.add(g);
+  g.position.set(x, 0, z);
+  cylinder(0.12, 0.19, 1.4, '#8e8161', 0, 0.7, 0, g);
+  const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.95, 0), mat('#66946e'));
+  m.position.y = 1.95;
+  m.scale.set(0.8, 1.35, 0.8);
+  m.castShadow = true;
+  g.add(m);
+  scenery.push(g);
+  return g;
+}
+function building(x, z, h = 5) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  scene.add(g);
+  box(4.8, h, 4, '#e8dfbb', 0, h / 2, 0, g);
+  box(5.1, 0.22, 4.3, '#f2eacb', 0, h + 0.1, 0, g);
+  for (let y = 1; y < h - 0.5; y += 1.6) {
+    for (const wx of [-1.5, 0, 1.5]) box(0.58, 0.88, 0.05, '#789189', wx, y, 2.03, g);
+  }
+  box(1.1, 1.7, 0.06, '#567972', 0, 0.9, 2.04, g);
+  scenery.push(g);
+  return g;
+}
+for (let i = 0; i < 15; i++) {
+  const z = -i * 9 + 5;
+  tree(-7 - worldRng() * 2, z);
+  tree(7 + worldRng() * 3, z - 4);
+  if (i % 2 === 0) {
+    building(-13 - worldRng() * 3, z - 4, 3 + worldRng() * 4);
+    building(13 + worldRng() * 4, z + 3, 3 + worldRng() * 6);
+  }
+}
+const knesset = new THREE.Group();
+scene.add(knesset);
+knesset.position.set(0, 0, -112);
+box(26, 0.5, 11, '#dbd7b4', 0, 0.4, 0, knesset);
+box(22, 5, 7, '#c7c5a8', 0, 3, 0, knesset);
+for (let x = -12; x <= 12; x += 2) box(0.72, 6, 1, '#f7efcd', x, 3.5, 4.2, knesset);
+box(27, 0.8, 10, '#f9efcf', 0, 6.8, 0, knesset);
+box(29, 0.4, 12, '#e1d9b7', 0, 7.35, 0, knesset);
+const knessetSign = label('הכנסת', 5, 1.4);
+knessetSign.position.set(0, 6.4, 5.02);
+knesset.add(knessetSign);
+const bus = new THREE.Group();
+scene.add(bus);
+bus.position.set(0, 0, 5);
+box(2.4, 1.65, 4.45, '#f5c649', 0, 1.38, 0, bus);
+box(2.22, 0.65, 3.9, '#ffdd72', 0, 2.38, -0.06, bus);
+box(2.35, 0.18, 4.26, '#ffe690', 0, 2.8, 0, bus);
+box(2.3, 0.27, 4.46, '#f1f0ce', 0, 0.95, 0, bus);
+box(1.96, 0.84, 0.05, '#365c5b', 0, 2.03, 2.24, bus);
+box(1.96, 0.84, 0.05, '#365c5b', 0, 2.03, -2.24, bus);
+for (const x of [-1.21, 1.21]) {
+  for (const z of [-1.34, -0.23, 0.88]) box(0.035, 0.72, 0.89, '#4e7771', x, 2.04, z, bus);
+  box(0.04, 0.68, 0.075, '#fbd567', x, 2.04, 1.35, bus);
+}
+box(2.5, 0.2, 0.2, '#e2e5cf', 0, 0.6, 2.25, bus);
+box(0.33, 0.21, 0.08, '#dd6451', -0.84, 1.1, 2.27, bus);
+box(0.33, 0.21, 0.08, '#dd6451', 0.84, 1.1, 2.27, bus);
+box(0.65, 0.2, 0.03, '#f4edce', 0, 0.89, 2.29, bus);
+const busTag = label('61', 1.3, 0.68, '#fff6d4', '#203831', 125);
+busTag.position.set(0, 1.45, 2.275);
+bus.add(busTag);
+const busSide = label('יאללה!', 1.8, 0.66, '#f5c649', '#203831', 90);
+busSide.rotation.y = Math.PI / 2;
+busSide.position.set(1.225, 1.3, -0.3);
+bus.add(busSide);
+const wheels = [];
+for (const x of [-1.18, 1.18])
+  for (const z of [-1.35, 1.35]) {
+    const w = cylinder(0.48, 0.48, 0.3, '#283d38', x, 0.53, z, bus, 16);
+    w.rotation.z = Math.PI / 2;
+    wheels.push(w);
+    const hub = cylinder(0.21, 0.21, 0.32, '#c8d1bb', x, 0.53, z, bus, 12);
+    hub.rotation.z = Math.PI / 2;
+  }
+box(1.8, 0.17, 2.25, '#617970', 0, 2.99, -0.2, bus);
+box(1.4, 0.7, 0.8, '#ead7af', 0, 3.42, -0.7, bus);
+box(0.18, 0.73, 0.82, '#668375', 0, 3.42, -0.7, bus);
+const megaphone = cylinder(0.4, 0.18, 0.75, '#f5edd4', 0, 3.42, 0.8, bus);
+megaphone.rotation.x = Math.PI / 2;
+const hole = cylinder(0.28, 0.28, 0.02, '#455e52', 0, 3.42, 1.185, bus);
+hole.rotation.x = Math.PI / 2;
+const pole = box(0.055, 1.5, 0.055, '#e3e2c7', -0.75, 3.55, -1.3, bus);
+const flag = box(0.75, 0.48, 0.025, '#f5f1df', -0.38, 4.08, -1.3, bus);
+box(0.75, 0.06, 0.03, '#4e83ab', -0.38, 4.25, -1.28, bus);
+box(0.75, 0.06, 0.03, '#4e83ab', -0.38, 3.91, -1.28, bus);
+const flagStar = label('✡', 0.24, 0.24, '#f5f1df', '#4e83ab', 160);
+flagStar.position.set(-0.38, 4.08, -1.275);
+bus.add(flagStar);
+const shieldMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(3.2, 20, 12),
+  new THREE.MeshBasicMaterial({ color: '#ffe56b', transparent: true, opacity: 0.15, wireframe: true })
+);
+shieldMesh.position.y = 1.5;
+shieldMesh.visible = false;
+bus.add(shieldMesh);
+function chair() {
+  const g = new THREE.Group();
+  box(1.05, 0.24, 1.03, '#4e89bf', 0, 1, 0, g);
+  box(1.05, 1.12, 0.24, '#659fd0', 0, 1.66, -0.42, g);
+  for (const x of [-0.4, 0.4]) for (const z of [-0.36, 0.36]) box(0.12, 0.7, 0.12, '#d5dbc8', x, 0.55, z, g);
+  for (const x of [-0.62, 0.62]) {
+    box(0.18, 0.16, 0.86, '#326b9f', x, 1.35, 0, g);
+    box(0.1, 0.3, 0.1, '#4e7891', x, 1.18, 0.27, g);
+  }
+  return g;
+}
+function obstacle(variant) {
+  const g = new THREE.Group();
+  box(2.32, 0.95, 0.62, '#dd6847', 0, 0.95, 0, g);
+  for (const x of [-0.84, 0.84]) {
+    box(0.17, 1.3, 0.17, '#617269', x, 0.65, 0, g);
+    box(0.54, 0.12, 0.9, '#617269', x, 0.12, 0, g);
+  }
+  for (let x = -0.85; x <= 0.85; x += 0.57) {
+    const stripe = box(0.26, 0.75, 0.015, '#fff2cf', x, 0.95, 0.32, g);
+    stripe.rotation.z = -0.35;
+  }
+  const sign = label(['SCANDAL', 'U-TURN', 'RECOUNT'][variant], 1.8, 0.42, '#f9ebc9', '#713622', 68);
+  sign.position.set(0, 1.75, 0.2);
+  g.add(sign);
+  return g;
+}
+function falafel() {
+  const g = new THREE.Group();
+  const pita = new THREE.Mesh(new THREE.SphereGeometry(0.65, 12, 8), mat('#f9d989'));
+  pita.scale.set(1, 0.85, 0.5);
+  pita.position.y = 1.3;
+  g.add(pita);
+  for (let i = 0; i < 3; i++) {
+    const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.27, 1), mat('#9b7843'));
+    ball.position.set((i - 1) * 0.35, 1.75, 0);
+    g.add(ball);
+  }
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.97, 0.035, 6, 24), mat('#ffef91'));
+  ring.position.y = 1.35;
+  g.add(ring);
+  return g;
+}
+function briefcase() {
+  const g = new THREE.Group();
+  box(1.5, 0.95, 0.55, '#edb937', 0, 1.2, 0, g);
+  box(0.6, 0.16, 0.2, '#725123', 0, 1.83, 0, g);
+  box(0.15, 0.9, 0.57, '#ffe6a0', 0, 1.2, 0, g);
+  const warning = label('+9 / +1 !', 2.3, 0.62, '#fbd659', '#762d26', 85);
+  warning.position.set(0, 2.15, 0.25);
+  g.add(warning);
+  return g;
+}
+const templates = {
+  seat: chair(),
+  shield: falafel(),
+  deal: briefcase(),
+  hazard0: obstacle(0),
+  hazard1: obstacle(1),
+  hazard2: obstacle(2)
 };
-if(incoming){$('challengeBanner').classList.remove('hidden');$('challengeBanner').textContent=tr('A FRIEND THINKS YOU CAN’T BEAT ','חבר חושב שלא תעברו ')+incoming.score.toLocaleString()+tr(' POINTS. PROVE THEM WRONG.',' נקודות. תוכיחו שהוא טועה.');$('play').querySelector('[data-i18n]').textContent=tr('ACCEPT THE CHALLENGE','האתגר התקבל');}
+let items = [],
+  particles = [];
+function addItem(type, lane, z, variant = 0) {
+  const g = templates[type === 'hazard' ? 'hazard' + variant : type].clone(true);
+  g.position.set((lane - 1) * 3.2, 0, z);
+  scene.add(g);
+  const item = { type, lane, z, mesh: g, variant, passed: false };
+  items.push(item);
+  return item;
+}
+function clearItems() {
+  items.forEach(i => scene.remove(i.mesh));
+  items = [];
+  particles.forEach(p => scene.remove(p.mesh));
+  particles = [];
+}
+function demoItems() {
+  clearItems();
+  addItem('seat', 0, -4);
+  addItem('seat', 0, -12);
+  addItem('seat', 1, -21);
+  addItem('hazard', 2, -12, 0);
+  addItem('shield', 2, -3);
+  addItem('seat', 2, -29);
+  addItem('hazard', 0, -35, 1);
+}
+demoItems();
+const particleGeo = new THREE.BoxGeometry(0.12, 0.24, 0.08);
+function burst(color, count = 16) {
+  if (reducedMotion) return;
+  for (let i = 0; i < count; i++) {
+    const m = new THREE.Mesh(particleGeo, mat(color));
+    m.position.copy(bus.position).add(new THREE.Vector3((Math.random() - 0.5) * 2, 2, 0));
+    scene.add(m);
+    particles.push({
+      mesh: m,
+      v: new THREE.Vector3((Math.random() - 0.5) * 6, 4 + Math.random() * 5, (Math.random() - 0.5) * 6),
+      life: 0.7 + Math.random() * 0.5
+    });
+  }
+}
+let lastPhase = -1,
+  lastSeed = null,
+  spinPulse = 0,
+  resultRoast = '';
+let state = 'home',
+  run = newRun(0),
+  mode = 'quick',
+  lane = 1,
+  rng = randomSeed(1),
+  spawnClock = 0,
+  rowIndex = 0,
+  countTime = 0,
+  toastTime = 0,
+  hitFlash = 0,
+  elapsed = 0,
+  last = 0,
+  menuBlend = 1,
+  animId,
+  challengeTarget = 0;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let mobile = innerWidth <= 700;
+function resize() {
+  mobile = innerWidth <= 700;
+  const r = arena.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / r.height;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(arena);
+resize();
+function showToast(message, kind = 'good') {
+  const el = $('toast');
+  el.textContent = message;
+  el.className = 'toast visible ' + kind;
+  toastTime = 2.5;
+}
+function updateHud() {
+  $('seats').textContent = run.seats;
+  $('timer').innerHTML = Math.ceil(DURATION - run.time) + '<span>s</span>';
+  $('seatFill').style.width = (run.seats / 120) * 100 + '%';
+  $('seatFill').style.background = run.seats >= 61 ? '#5b976d' : '#437aaf';
+  $('shield').classList.toggle('hidden', !run.shield);
+  shieldMesh.visible = run.shield;
+  $('strikes').textContent = '✕'.repeat(run.hits) + '○'.repeat(Math.max(0, 3 - run.hits));
+  $('strikes').setAttribute('aria-label', tr(run.hits + ' of 3 scandals', run.hits + ' מתוך 3 שערוריות'));
+  $('combo').textContent = tr('STREAK ', 'רצף ') + run.combo;
+  $('horn').disabled = run.spinCooldown > 0 || state !== 'running';
+  $('horn').textContent = run.spinCooldown > 0 ? Math.ceil(run.spinCooldown) + 's' : tr('SPIN!', 'ספין!');
+  $('liveScore').textContent = score(run).toLocaleString();
+  $('defection').classList.toggle('hidden', !run.formed);
+  $('defection').textContent =
+    tr('PARTNERS DEFECT IN ', 'עריקה בעוד ') +
+    Math.ceil(run.defectIn) +
+    tr('s · −4 SEATS', ' שנ׳ · 4− מנדטים');
+  $('challengeHud').classList.toggle('hidden', !incoming || mode !== 'challenge');
+  if (incoming)
+    $('challengeHud').textContent =
+      tr('BEAT ', 'לעבור את ') + incoming.score.toLocaleString() + tr(' PTS', ' נק׳');
+}
+function start(which = 'quick', replay = false) {
+  mode = which;
+  const seed =
+    replay && lastSeed !== null
+      ? lastSeed
+      : mode === 'challenge' && incoming
+        ? incoming.seed
+        : mode === 'daily'
+          ? hash(RULESET + dayKey())
+          : crypto.getRandomValues(new Uint32Array(1))[0];
+  lastSeed = seed;
+  lastPhase = -1;
+  spinPulse = 0;
+  run = newRun(seed);
+  rng = randomSeed(seed);
+  lane = 1;
+  bus.position.x = 0;
+  bus.rotation.set(0, 0, 0);
+  spawnClock = 0;
+  rowIndex = 0;
+  countTime = 2.5;
+  hitFlash = 0;
+  state = 'countdown';
+  clearItems();
+  $('home').classList.add('hidden');
+  $('results').classList.add('hidden');
+  $('pauseOverlay').classList.add('hidden');
+  $('hud').classList.remove('hidden');
+  $('countdown').classList.remove('hidden');
+  $('touchControls').classList.remove('hidden');
+  $('gameHint').classList.remove('hidden');
+  $('modeLabel').textContent =
+    mode === 'challenge'
+      ? tr('GROUP CHAT DUEL', 'דו־קרב קבוצתי')
+      : mode === 'daily'
+        ? tr('DAILY CHAOS', 'כאוס יומי')
+        : tr('CHAOS RUN', 'סיבוב כאוס');
+  $('chaosStatus').classList.remove('hidden');
+  $('challengeBanner').classList.add('hidden');
+  arena.classList.remove('boss');
+  arena.classList.add('playing');
+  $('toast').classList.remove('visible');
+  updateHud();
+  canvas.focus({ preventScroll: true });
+  tone(330, 0.12);
+}
+function goHome() {
+  state = 'home';
+  [
+    'results',
+    'pauseOverlay',
+    'hud',
+    'touchControls',
+    'countdown',
+    'gameHint',
+    'chaosStatus',
+    'defection'
+  ].forEach(id => $(id).classList.add('hidden'));
+  $('home').classList.remove('hidden');
+  $('toast').classList.remove('visible');
+  arena.classList.remove('playing', 'boss');
+  if (incoming) $('challengeBanner').classList.remove('hidden');
+  shieldMesh.visible = false;
+  lane = 1;
+  demoItems();
+  $('play').focus({ preventScroll: true });
+}
+function steer(dir) {
+  if (state !== 'running' && state !== 'countdown') return;
+  const next = Math.max(0, Math.min(2, lane + dir));
+  if (next !== lane) {
+    lane = next;
+    tone(130 + lane * 40, 0.05, 'sine', 0.025);
+  }
+}
+function pause() {
+  if (state !== 'running') return;
+  state = 'paused';
+  $('pauseOverlay').classList.remove('hidden');
+  $('resume').focus({ preventScroll: true });
+}
+function resume() {
+  if (state !== 'paused') return;
+  state = 'running';
+  $('pauseOverlay').classList.add('hidden');
+  canvas.focus({ preventScroll: true });
+}
+const jokes = {
+  en: [
+    'You promised free parking. In Tel Aviv. −12.',
+    'You sent the voice note to the WRONG group. −12.',
+    'Your partner wants Minister of Everything. −12.'
+  ],
+  he: [
+    'הבטחת חניה חינם. בתל אביב. 12− מנדטים.',
+    'שלחת את ההקלטה לקבוצה הלא נכונה. 12− מנדטים.',
+    'השותף דורש להיות שר הכל. 12− מנדטים.'
+  ]
+};
+function announceMajority() {
+  showToast(tr('61! CONGRATS. YOUR PARTNERS NOW HATE YOU.', '61! מזל טוב. עכשיו השותפים שונאים אותך.'));
+  burst('#fbd659', 45);
+  tone(880, 0.3);
+}
+function spin() {
+  if (state !== 'running' || run.spinCooldown > 0) return;
+  const threats = items.filter(
+    i => i.type === 'hazard' && !i.passed && i.mesh.position.z > -27 && i.mesh.position.z < 3
+  );
+  if (!threats.length) {
+    showToast(tr('Save the spin. No scandals in range.', 'שמור את הספין. אין שערוריות בטווח.'));
+    return;
+  }
+  if (!useSpin(run)) return;
+  for (const i of threats) {
+    i.passed = true;
+    i.mesh.visible = false;
+  }
+  spinPulse = 0.8;
+  showToast(tr('BREAKING: LOOK! SOMETHING ELSE!', 'מבזק: תראו! משהו אחר!'));
+  tone(180, 0.25, 'sawtooth', 0.04);
+  burst('#fbd659', 30);
+  updateHud();
+}
+function hit(item) {
+  const outcome = collect(run, item.type);
+  if (outcome.kind === 'formed') announceMajority();
+  else if (outcome.kind === 'seat') {
+    if (outcome.combo % 5 === 0)
+      showToast(tr('COMBO! +6. Everyone suddenly loves you.', 'קומבו! 6+. פתאום כולם אוהבים אותך.'));
+    burst('#70b4e5', 9);
+    tone(450 + (outcome.combo % 5) * 90, 0.1);
+  } else if (outcome.kind === 'deal') {
+    showToast(
+      tr('DIRTY DEAL: +9 SEATS. +1 SCANDAL. WORTH IT?', 'דיל מסריח: 9+ מנדטים. שערורייה 1+. היה שווה?'),
+      'bad'
+    );
+    tone(240, 0.22);
+    burst('#fbd659');
+    if (outcome.formed) announceMajority();
+  } else if (outcome.kind === 'shield') {
+    showToast(tr('Falafel immunity. Legally delicious.', 'חסינות פלאפל. טעים וחוקי.'));
+    tone(730, 0.18);
+    burst('#fbd659');
+  } else if (outcome.kind === 'saved') {
+    showToast(
+      tr(
+        'Your legal team is three falafel balls. It worked.',
+        'הצוות המשפטי שלך הוא שלושה כדורי פלאפל. זה עבד.'
+      )
+    );
+    tone(540, 0.2);
+    burst('#fbd659');
+  } else if (outcome.kind === 'hit') {
+    showToast(jokes[lang][item.variant], 'bad');
+    hitFlash = 0.5;
+    tone(110, 0.3, 'sawtooth', 0.04);
+    burst('#dc684c');
+    if (navigator.vibrate) navigator.vibrate(35);
+  }
+  updateHud();
+  if (run.ended) finish();
+}
+function roast() {
+  if (run.reason === 'won')
+    return tr(
+      'You survived the coalition. The family WhatsApp is next.',
+      'שרדת קואליציה. עכשיו נסה לשרוד את הוואטסאפ המשפחתי.'
+    );
+  if (run.deals >= 2)
+    return tr(
+      'You sold your principles. Forgot to ask for a receipt.',
+      'מכרת את העקרונות. שכחת לבקש חשבונית.'
+    );
+  if (run.peak >= 61)
+    return tr(
+      'Your government lasted less than a voice note from your aunt.',
+      'הממשלה שלך החזיקה פחות מהודעה קולית של דודה שלך.'
+    );
+  if (run.time < 20)
+    return tr(
+      'The lettuce in your fridge has a longer political career.',
+      'לחסה במקרר שלך יש קריירה פוליטית ארוכה יותר.'
+    );
+  if (run.seats === 60)
+    return tr('60 seats. Even your imaginary friend abstained.', '60 מנדטים. אפילו החבר הדמיוני שלך נמנע.');
+  return tr(
+    'You couldn’t form a coalition in a group chat of three.',
+    'לא הצלחת להקים קואליציה אפילו בקבוצה של שלושה.'
+  );
+}
+function finish() {
+  state = 'results';
+  run.ended = true;
+  const won = run.reason === 'won';
+  const points = score(run);
+  const newBest = points > best;
+  if (newBest) {
+    best = points;
+    save('cc-best-v2', best);
+    $('best').textContent = best.toLocaleString();
+  }
+  ['hud', 'touchControls', 'gameHint', 'chaosStatus', 'defection'].forEach(id =>
+    $(id).classList.add('hidden')
+  );
+  $('toast').classList.remove('visible');
+  $('results').classList.remove('hidden');
+  arena.classList.remove('boss');
+  $('resultEyebrow').textContent = newBest
+    ? tr('NEW BEST. LOW BAR. BUT STILL.', 'שיא חדש. רף נמוך. אבל עדיין.')
+    : tr('OFFICIAL CERTIFICATE OF CHAOS', 'תעודת כאוס רשמית');
+  $('resultTitle').textContent = won
+    ? tr('Somehow. A government.', 'איכשהו. יש ממשלה.')
+    : run.reason === 'scandals'
+      ? tr('3 scandals. You’re fired.', '3 שערוריות. הביתה.')
+      : run.peak >= 61
+        ? tr('61. Then betrayal.', '61. ואז בגידה.')
+        : tr('Prime Minister of Nothing.', 'ראש ממשלת כלום.');
+  resultRoast = roast();
+  $('resultJoke').textContent = resultRoast;
+  $('resultSeats').textContent = points.toLocaleString();
+  $('resultBest').textContent = run.seats;
+  $('resultHits').textContent = run.hits + '/3';
+  $('resultTime').textContent = run.maxCombo + '×';
+  $('resultStamp').textContent = won ? tr('SURVIVED', 'שרדתי') : tr('DISSOLVED', 'התפזרתי');
+  $('resultStamp').classList.toggle('win', won);
+  $('duelResult').textContent =
+    incoming && mode === 'challenge'
+      ? points > incoming.score
+        ? tr('YOU BEAT YOUR FRIEND BY ', 'ניצחת את החבר ב־') +
+          (points - incoming.score) +
+          tr(' POINTS. SEND THE RECEIPT.', ' נקודות. שלח לו הוכחה.')
+        : points === incoming.score
+          ? tr('A TIE. DEMAND A RECOUNT.', 'תיקו. לדרוש ספירה חוזרת.')
+          : tr('YOUR FRIEND IS AHEAD BY ', 'החבר מוביל ב־') +
+            (incoming.score - points) +
+            tr(' POINTS. REVENGE?', ' נקודות. נקמה?')
+      : tr('Your friend gets this exact road. No excuses.', 'החבר יקבל בדיוק את אותו הכביש. בלי תירוצים.');
+  $('share').querySelector('[data-i18n]').textContent = text[lang].share;
+  $('again').focus({ preventScroll: true });
+  tone(won ? 880 : 160, 0.4);
+  if (won) burst('#fbd659', 65);
+}
+const calmSky = new THREE.Color('#c5e5d7'),
+  crisisSky = new THREE.Color('#d5b5a7');
+function update(dt) {
+  elapsed += dt;
+  scene.background.lerp(
+    state === 'running' && phase(run.time) === 3 ? crisisSky : calmSky,
+    Math.min(1, dt * 2)
+  );
+  scene.fog.color.copy(scene.background);
+  const playing = state === 'running';
+  const idle = state === 'home';
+  menuBlend = THREE.MathUtils.damp(menuBlend, idle ? 1 : 0, 3.7, dt);
+  const menuPos = mobile ? new THREE.Vector3(18, 21, 28) : new THREE.Vector3(23, 21, 30);
+  const playPos = mobile ? new THREE.Vector3(0, 12, 22) : new THREE.Vector3(0, 14, 25);
+  camera.position.copy(playPos.lerp(menuPos, menuBlend));
+  const target = mobile
+    ? new THREE.Vector3(0, 0, -6).lerp(new THREE.Vector3(-1, 0, -1), menuBlend)
+    : new THREE.Vector3(0, 0, -14).lerp(new THREE.Vector3(-8, 0, -8), menuBlend);
+  camera.lookAt(target);
+  if (idle) {
+    bus.position.x = 0;
+    bus.rotation.y = -0.1;
+    bus.position.y = reducedMotion ? 0 : Math.sin(elapsed * 2) * 0.035;
+  }
+  if (state === 'countdown') {
+    countTime -= dt;
+    $('countdown').textContent = countTime > 0.6 ? Math.ceil(countTime - 0.5) : tr('GO!', 'יאללה!');
+    if (countTime <= 0) {
+      state = 'running';
+      $('countdown').classList.add('hidden');
+      tone(760, 0.16);
+    }
+  }
+  if (playing) {
+    const events = tick(run, dt);
+    if (events.defected) {
+      showToast(tr('4 PARTNERS LEFT THE CHAT. −4 SEATS.', '4 שותפים עזבו את הקבוצה. 4− מנדטים.'), 'bad');
+      burst('#dc684c', 8);
+      tone(180, 0.13);
+    }
+    const stage = phase(run.time);
+    if (stage !== lastPhase) {
+      lastPhase = stage;
+      const headlines = [
+        tr('01 / SMILE. THE CAMERAS ARE ON.', '01 / לחייך. המצלמות עובדות.'),
+        tr('02 / HOT MIC. COLD SWEAT.', '02 / מיקרופון פתוח. זיעה קרה.'),
+        tr('03 / EVERYONE WANTS YOUR CHAIR.', '03 / כולם רוצים את הכיסא שלך.'),
+        tr('04 / NO-CONFIDENCE VOTE. HOLD ON.', '04 / הצבעת אי־אמון. להחזיק חזק.')
+      ];
+      $('phaseLabel').textContent = headlines[stage];
+      if (stage > 0) {
+        showToast(headlines[stage], stage === 3 ? 'bad' : 'good');
+        tone(170 + stage * 100, 0.3);
+      }
+      arena.classList.toggle('boss', stage === 3);
+    }
+    bus.position.x = THREE.MathUtils.damp(bus.position.x, (lane - 1) * 3.2, 15, dt);
+    const tilt = THREE.MathUtils.clamp(((lane - 1) * 3.2 - bus.position.x) * -0.07, -0.15, 0.15);
+    bus.rotation.z = THREE.MathUtils.damp(bus.rotation.z, reducedMotion ? 0 : tilt, 12, dt);
+    bus.rotation.y = THREE.MathUtils.damp(bus.rotation.y, 0, 10, dt);
+    bus.position.y = reducedMotion ? 0 : Math.sin(elapsed * 20) * 0.018;
+    const { speed, interval } = pace(run);
+    laneMarks.forEach(m => {
+      m.position.z += speed * dt;
+      if (m.position.z > 27) m.position.z -= 165;
+    });
+    scenery.forEach(g => {
+      g.position.z += speed * dt;
+      if (g.position.z > 24) g.position.z -= 144;
+    });
+    wheels.forEach(w => (w.rotation.x -= speed * dt * 1.3));
+    spawnClock -= dt;
+    if (spawnClock <= 0) {
+      for (const spec of courseRow(rng, rowIndex, run.time)) addItem(spec.type, spec.lane, -63, spec.variant);
+      rowIndex++;
+      spawnClock += interval;
+    }
+    for (const item of items) {
+      item.mesh.position.z += speed * dt;
+      if (!item.passed && item.mesh.position.z >= 3) {
+        item.passed = true;
+        if (Math.abs(item.mesh.position.x - bus.position.x) < 1.35) {
+          item.mesh.visible = false;
+          hit(item);
+          if (state !== 'running') break;
+        }
+      }
+    }
+    if (run.time > 6) $('gameHint').classList.add('hidden');
+    if (run.ended && state === 'running') finish();
+    updateHud();
+  }
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    if (item.mesh.position.z > 14) {
+      scene.remove(item.mesh);
+      items.splice(i, 1);
+    } else if (item.type !== 'hazard' && state !== 'paused') {
+      item.mesh.rotation.y = Math.sin(elapsed * 1.8 + item.z) * 0.25;
+      item.mesh.position.y = reducedMotion ? 0 : Math.sin(elapsed * 3 + item.z) * 0.12;
+    }
+  }
+  if (state !== 'paused') {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      p.v.y -= 10 * dt;
+      p.mesh.position.addScaledVector(p.v, dt);
+      p.mesh.rotation.x += dt * 5;
+      p.mesh.rotation.z += dt * 4;
+      if (p.life <= 0) {
+        scene.remove(p.mesh);
+        particles.splice(i, 1);
+      }
+    }
+    toastTime -= dt;
+    if (toastTime <= 0) $('toast').classList.remove('visible');
+    spinPulse = Math.max(0, spinPulse - dt);
+    arena.classList.toggle('spinning', spinPulse > 0);
+    hitFlash = Math.max(0, hitFlash - dt);
+    bus.visible = hitFlash > 0 ? Math.floor(hitFlash * 20) % 2 === 0 : true;
+  }
+  renderer.render(scene, camera);
+}
+function frame(time) {
+  const dt = Math.min((time - last) / 1000 || 0, 0.05);
+  last = time;
+  update(dt);
+  animId = requestAnimationFrame(frame);
+}
+animId = requestAnimationFrame(frame);
+$('loading').classList.add('hidden');
+$('play').disabled = false;
+$('daily').disabled = false;
+$('play').onclick = () => start(incoming ? 'challenge' : 'quick');
+$('daily').onclick = () => start('daily');
+$('again').onclick = () => start(mode, true);
+$('fresh').onclick = () => start('quick');
+$('horn').onclick = spin;
+$('resultHome').onclick = goHome;
+$('quit').onclick = goHome;
+$('pause').onclick = pause;
+$('resume').onclick = resume;
+$('left').onpointerdown = e => {
+  e.preventDefault();
+  steer(-1);
+};
+$('right').onpointerdown = e => {
+  e.preventDefault();
+  steer(1);
+};
+$('language').onclick = () => {
+  lang = lang === 'en' ? 'he' : 'en';
+  save('cc-lang', lang);
+  translate();
+};
+$('sound').onclick = () => {
+  sound = !sound;
+  setSound();
+  tone(620, 0.1);
+};
+let pointerStart = null;
+canvas.addEventListener('pointerdown', e => {
+  pointerStart = { x: e.clientX, y: e.clientY };
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e => {
+  if (!pointerStart) return;
+  const dx = e.clientX - pointerStart.x;
+  if (Math.abs(dx) > 24) {
+    steer(dx > 0 ? 1 : -1);
+    pointerStart = { x: e.clientX, y: e.clientY };
+  }
+});
+canvas.addEventListener('pointerup', () => (pointerStart = null));
+canvas.addEventListener('pointercancel', () => (pointerStart = null));
+document.addEventListener('keydown', e => {
+  if ($('info').open) return;
+  if (
+    ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'Escape', 'a', 'd', 'A', 'D', 'p', 'P'].includes(
+      e.key
+    ) &&
+    ['running', 'countdown', 'paused'].includes(state)
+  ) {
+    e.preventDefault();
+    if (e.repeat) return;
+    if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') steer(-1);
+    else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') steer(1);
+    else if (e.key === ' ' && state === 'running') spin();
+    else if (['Escape', 'p', 'P'].includes(e.key)) {
+      if (state === 'paused') resume();
+      else pause();
+    }
+  }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) pause();
+});
+window.addEventListener('blur', pause);
+canvas.addEventListener('webglcontextlost', e => {
+  e.preventDefault();
+  cancelAnimationFrame(animId);
+  pause();
+  $('error').classList.remove('hidden');
+  $('errorText').textContent = tr(
+    'The graphics connection was interrupted. Reload to start a fresh run.',
+    'החיבור הגרפי הופסק. טענו מחדש כדי להתחיל סיבוב חדש.'
+  );
+});
+let returnFocus = null;
+function info(kind) {
+  pause();
+  returnFocus = document.activeElement;
+  if (kind === 'help')
+    $('infoContent').innerHTML = tr(
+      '<span class="eyebrow">A 61-SECOND CRASH COURSE</span><h2>How to run the country.<br>Well, the bus.</h2><ol><li><b>Steer between three lanes.</b> Swipe, tap the arrow buttons, or use ← → / A D.</li><li><b>Collect blue chairs.</b> Each adds 3 seats. Every fifth consecutive pickup adds 6!</li><li><b>Dodge red scandals.</b> They cost 12 seats and reset your streak. Three scandals end the run, even with 120 seats.</li><li><b>Grab a falafel shield.</b> It absorbs one scandal. Shields don’t stack.</li><li><b>Finish with 61+ seats.</b> You start with 24. After your first majority, four partners defect after six seconds, then every four seconds. Keep collecting! Zero seats ends it early.</li></ol><p><b>Gold briefcase:</b> +9 seats but +1 scandal, even with a shield. Risk it or dodge it!<br><b>Space / SPIN:</b> clears red barriers in front of you; 12-second cooldown. Esc / P pauses. Daily Chaos uses the same course for everyone, resetting at midnight in Jerusalem. Best scores stay on this device.</p>',
+      '<span class="eyebrow">קורס מזורז ב־61 שניות</span><h2>איך מנהלים מדינה.<br>כלומר, אוטובוס.</h2><ol><li><b>זזים בין שלושה נתיבים.</b> מחליקים, מקישים על החצים או משתמשים בחצי המקלדת.</li><li><b>אוספים כיסאות כחולים.</b> כל כיסא מוסיף 3 מנדטים. כל איסוף חמישי ברצף מוסיף 6!</li><li><b>מתחמקים משערוריות אדומות.</b> הן מורידות 12 מנדטים ומאפסות את הרצף. שלוש שערוריות מסיימות את הסיבוב, גם עם 120 מנדטים.</li><li><b>לוקחים מגן פלאפל.</b> הוא סופג שערורייה אחת. אי אפשר לצבור מגנים.</li><li><b>מסיימים עם 61 מנדטים לפחות.</b> מתחילים עם 24. אחרי הרוב הראשון, ארבעה שותפים עורקים כעבור שש שניות ואז כל ארבע שניות. ממשיכים לאסוף! אפס מנדטים מסיים את הסיבוב מוקדם.</li></ol><p><b>מזוודת זהב:</b> 9+ מנדטים אבל שערורייה 1+, גם עם מגן. לקחת או להתחמק?<br><b>רווח / ספין:</b> מנקה מחסומים אדומים קרובים; נטען במשך 12 שניות. Esc / P משהים. הכאוס היומי זהה לכולם ומתחדש בחצות לפי שעון ירושלים. השיאים נשמרים במכשיר הזה.</p>'
+    );
+  else
+    $('infoContent').innerHTML = tr(
+      '<span class="eyebrow">REAL MATH. RIDICULOUS BUS.</span><h2>Why 61?</h2><p>Israel’s Knesset has <b>120 seats</b>, so 61 is an absolute majority. Coalition-building is the inspiration for this game. Actual government formation follows parliamentary confidence procedures; this is an arcade simplification, not a civics simulator.</p><p>Parties need at least <b>3.25% of valid votes</b> to participate in seat allocation. Seats are distributed proportionally among qualifying lists.</p><p>We’re poking fun at political chaos, coalition bargaining, and election fatigue—not asking you to vote for anyone. The bus, scandals, bonuses, and results are fictional.</p><p><a href="https://main.knesset.gov.il/en/mk/pages/elections.aspx" target="_blank" rel="noopener noreferrer">Learn about elections on the Knesset website ↗</a></p>',
+      '<span class="eyebrow">חשבון אמיתי. אוטובוס מגוחך.</span><h2>למה 61?</h2><p>בכנסת יש <b>120 מושבים</b>, ולכן 61 הם רוב מוחלט. הרכבת קואליציה היא ההשראה למשחק. הקמת ממשלה כפופה להליכי אמון בכנסת; המשחק הוא פישוט ארקייד, לא סימולטור אזרחות.</p><p>רשימה צריכה לקבל לפחות <b>3.25% מהקולות הכשרים</b> כדי להשתתף בחלוקת המנדטים, המחולקים באופן יחסי בין הרשימות שעברו את אחוז החסימה.</p><p>אנחנו צוחקים על הבלגן הפוליטי, המיקוח הקואליציוני ועייפות הבחירות — בלי לבקש להצביע לאף אחד. האוטובוס, השערוריות והתוצאות בדיוניים.</p><p><a href="https://main.knesset.gov.il/mk/elections/Pages/default.aspx" target="_blank" rel="noopener noreferrer">על הבחירות באתר הכנסת ↗</a></p>'
+    );
+  $('info').showModal();
+}
+$('help').onclick = () => info('help');
+$('about').onclick = () => info('about');
+$('closeInfo').onclick = () => $('info').close();
+$('info').addEventListener('close', () => returnFocus?.focus());
+$('info').addEventListener('click', e => {
+  const r = $('info').getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)
+    $('info').close();
+});
+$('share').onclick = async () => {
+  const shareBase = ['localhost', '127.0.0.1'].includes(location.hostname)
+    ? 'https://coalition-chaos-road-to-61.itamarstaga.chatgpt.site/'
+    : location.href;
+  const url = challengeURL(shareBase, run),
+    points = score(run);
+  const shareText =
+    tr('🚌 COALITION CHAOS — ' + points + ' points\n', '🚌 כאוס קואליציוני — ' + points + ' נקודות\n') +
+    resultRoast +
+    '\n' +
+    tr(
+      '🪑 ' +
+        run.seats +
+        ' seats · 💥 ' +
+        run.hits +
+        '/3 scandals · ⏱ ' +
+        Math.floor(run.time) +
+        's\nSame road. Beat me. No excuses.',
+      '🪑 ' +
+        run.seats +
+        ' מנדטים · 💥 ' +
+        run.hits +
+        '/3 שערוריות · ⏱ ' +
+        Math.floor(run.time) +
+        ' שניות\nאותו כביש. בואו תעברו אותי. בלי תירוצים.'
+    );
+  try {
+    await navigator.clipboard.writeText(shareText + '\n' + url);
+    $('share').querySelector('[data-i18n]').textContent = tr(
+      'Copied. Go start a group-chat war.',
+      'הועתק. יאללה, בלגן בקבוצה.'
+    );
+  } catch {
+    $('infoContent').replaceChildren();
+    const h = document.createElement('h2');
+    h.textContent = tr('Copy your challenge', 'העתיקו את האתגר');
+    const textarea = document.createElement('textarea');
+    textarea.value = shareText + '\n' + url;
+    textarea.style.cssText = 'width:100%;height:180px;font:14px/1.5 sans-serif';
+    textarea.readOnly = true;
+    $('infoContent').append(h, textarea);
+    $('info').showModal();
+    textarea.select();
+  }
+};
+if (incoming) {
+  $('challengeBanner').classList.remove('hidden');
+  $('challengeBanner').textContent =
+    tr('A FRIEND THINKS YOU CAN’T BEAT ', 'חבר חושב שלא תעברו ') +
+    incoming.score.toLocaleString() +
+    tr(' POINTS. PROVE THEM WRONG.', ' נקודות. תוכיחו שהוא טועה.');
+  $('play').querySelector('[data-i18n]').textContent = tr('ACCEPT THE CHALLENGE', 'האתגר התקבל');
+}
 
-if(document.modelContext?.registerTool){const lifecycle=new AbortController();window.addEventListener('pagehide',()=>lifecycle.abort(),{once:true});const tools=[{name:'read_coalition_game',title:'Read current game',description:'Read the current mode, game phase, seats, time remaining and local personal best.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:false},execute:()=>({phase:state,mode,seats:run.seats,secondsRemaining:Math.ceil(DURATION-run.time),best,score:score(run),scandals:run.hits,combo:run.combo,spinCooldown:run.spinCooldown,formed:run.formed,seed:run.seed,phaseIndex:phase(run.time)})},{name:'start_coalition_run',title:'Start a coalition run',description:'Start a quick or daily run from the home or results screen. Replaces the displayed result with a new countdown.',inputSchema:{type:'object',properties:{mode:{type:'string',enum:['quick','daily']}},required:['mode'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute:input=>{if(!input||!['quick','daily'].includes(input.mode)||Object.keys(input).length!==1)throw new Error('Provide only mode: quick or daily.');if(!['home','results'].includes(state))throw new Error('Finish or quit the current run first.');start(input.mode);return {phase:state,mode,seats:run.seats};}}];for(const tool of tools){try{Promise.resolve(document.modelContext.registerTool(tool,{signal:lifecycle.signal})).catch(()=>{});}catch{}}}
+if (document.modelContext?.registerTool) {
+  const lifecycle = new AbortController();
+  window.addEventListener('pagehide', () => lifecycle.abort(), { once: true });
+  const tools = [
+    {
+      name: 'read_coalition_game',
+      title: 'Read current game',
+      description: 'Read the current mode, game phase, seats, time remaining and local personal best.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: true, untrustedContentHint: false },
+      execute: () => ({
+        phase: state,
+        mode,
+        seats: run.seats,
+        secondsRemaining: Math.ceil(DURATION - run.time),
+        best,
+        score: score(run),
+        scandals: run.hits,
+        combo: run.combo,
+        spinCooldown: run.spinCooldown,
+        formed: run.formed,
+        seed: run.seed,
+        phaseIndex: phase(run.time)
+      })
+    },
+    {
+      name: 'start_coalition_run',
+      title: 'Start a coalition run',
+      description:
+        'Start a quick or daily run from the home or results screen. Replaces the displayed result with a new countdown.',
+      inputSchema: {
+        type: 'object',
+        properties: { mode: { type: 'string', enum: ['quick', 'daily'] } },
+        required: ['mode'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: false, untrustedContentHint: false },
+      execute: input => {
+        if (!input || !['quick', 'daily'].includes(input.mode) || Object.keys(input).length !== 1)
+          throw new Error('Provide only mode: quick or daily.');
+        if (!['home', 'results'].includes(state)) throw new Error('Finish or quit the current run first.');
+        start(input.mode);
+        return { phase: state, mode, seats: run.seats };
+      }
+    }
+  ];
+  for (const tool of tools) {
+    try {
+      Promise.resolve(document.modelContext.registerTool(tool, { signal: lifecycle.signal })).catch(() => {});
+    } catch {}
+  }
+}
