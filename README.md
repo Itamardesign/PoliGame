@@ -1,36 +1,63 @@
 # קואליציה קארט — Coalition Kart
 
-A playable Hebrew 3D election kart racer, evolved from the existing Coalition Chaos art direction. Original procedural karts and caricatures; real party marks. No Nintendo assets.
+A Hebrew 3D kart racer about Israeli politics. Six leaders race through a Jerusalem built in code, and the main mode is a three-race season for the Knesset's 120 seats: nobody wins 61 alone, so between races you build a coalition.
+
+Single-player, in the browser, no backend. Everything except the party marks, the portraits and the font is generated in code: the city, the karts, the textures, the music and the sound.
 
 ## Run
 
-`npm start` then open http://127.0.0.1:4173. The static release is `dist/`. The original bus game remains at `/classic.html` (original documentation: `CLASSIC.md`). Three.js, Hebrew fonts and all logos are bundled locally. No backend, tracking, account or network connection is required after loading the files.
+`npm start`, then open http://127.0.0.1:4173. The static build is `dist/`. The original bus game is still at `/classic.html` (see `CLASSIC.md`).
 
 ## Deploy to Vercel
 
-Import this repository as a Vercel project with **Root Directory** set to `coalition-chaos` if importing the enclosing `Polili-Game3d` repository. If the repository itself starts in this folder, leave Root Directory at its default. The included `vercel.json` selects the static `dist/` output and requires no build command or environment variables. The main game is at `/`, and the original bus game is at `/classic.html`.
+Import the repository with **Root Directory** `coalition-chaos` if you import the enclosing `Polili-Game3d` repository; otherwise leave it at the default. `vercel.json` serves `dist/` with no build step and no environment variables.
 
-## Play
+## Modes
 
-- Six selectable leaders: Benjamin Netanyahu / Likud, Yair Lapid / Yesh Atid, Yair Golan / Democrats, Avigdor Lieberman / Yisrael Beytenu, Aryeh Deri / Shas, Itamar Ben Gvir / Otzma Yehudit.
-- Six bespoke vehicles, each with its own chassis and gimmick: Likud's armoured state limousine (tinted VIP cabin, chrome grille, fender flags), Yesh Atid's wedge GT (side pods, rear wing, blinking ON AIR sign, anchor's desk mic), the Democrats' protest dune buggy (tall roll cage, megaphone, flag, exposed V-twin, knobby tyres), Yisrael Beytenu's muscle car (supercharger through the hood, side pipes, ducktail), Shas' gilded throne carriage (velvet throne, crown, lanterns, gold spoked wheels) and Otzma Yehudit's lifted patrol 4x4 (flashing police light bar, bull bar, snorkel, spare wheel). Vehicle choice is cosmetic; player baseline stats are equal.
-- Three selectable courses: the original Jerusalem Grand Prix (150cc, with two secret shortcuts), a reverse Market Mayhem route (200cc, more hazards), and The 61st Night (250cc, super hard AI and no shortcuts). Each has three laps, its own route geometry, four named districts and a separate local best time. The 20-unit-wide tarmac has textured asphalt, banked shoulders and corner chevrons. Five AI opponents, continuous lateral steering, centrifugal corner forces, live position and minimap are included.
-- Auto acceleration, with extra throttle on W/Up or the touch gas button. Smooth, damped steering with arrows or A/D, using physical key codes so Hebrew keyboard layouts work. Right steers screen-right everywhere on the circuit. Down/S brakes. C switches chase cameras; steering sensitivity is adjustable in the pause menu and saved locally. Hold Shift and steer for drift charge; release after blue for boost, after orange for a longer boost, or purple for ultra turbo. Tap Shift in the air for a trick and landing boost. Press W/Up or touch gas as the countdown reaches 1 for a launch boost.
-- Space or the item card activates a campaign item: promises turbo, parliamentary immunity (six seconds; absorbs one attack), a visible flying surprise poll (slows the closest opponent ahead), or a seven-second ballot magnet. Opponents use items too.
-- Ballot pickups increase top speed up to ten. Inside-line cyan pads provide boosts. Grass slows the kart; barricades stun it. Kart contact nudges and gently slows both cars, including AI rivals, with a brief impact cooldown.
-- Rolling spin balls cross the road with visible warning strips; a close dodge earns turbo. Golden bonus gates switch sides each lap and award three ballots plus boost. Turbo contact can stun rivals; shields absorb one hit.
-- Two real shortcuts: a blossom garden and an arched sandstone alley. Look for question-mark gates and colored stones, enter at speed, and hold a narrow line to save time. Both have trick ramps; shortcuts preserve lap progress.
-- Photo-true drivers: each leader's face is taken from a freely licensed portrait and projected onto a 3D head whose relief (brow, eye sockets, nose, mouth, chin) follows that photo's landmarks. It is blended into a matching hair/skin base, with 3D ears and kippot where worn. Bodies are SDF-sculpted suits whose shirt, tie and pin colours match the same photos. Three drift tiers, tire marks, jump tricks, slipstream boosts, impact bursts, shield bubbles, item projectiles, speed effects and optional engine audio make actions visible and audible.
-- 150cc is competitive. 200cc and 250cc opponents are faster and require boost use. No-input play loses; accurate steering and item timing matter.
-- On phones and touch tablets, the race fills the visible screen with a compact HUD and large thumb controls for steering, gas, brake and drift. Gas adds a little speed above automatic acceleration and can trigger a launch boost at the countdown's final second. A collected item glows; tap its card or an open part of the track to use it. Touch buttons support simultaneous steering and drift. Esc/P pauses. Tab switching pauses automatically. Optional sound, fullscreen, replay and garage controls included.
+- **The Race to 61 (המרוץ ל־61).** Three races (Knesset Avenue at 150cc, the reversed city at dusk at 200cc, Jerusalem at night at 250cc) hand out seats by finishing place: 12, 9, 7, 5, 4, 3, which adds up to 120 over the season. Between races you may invite up to two partners, but a party will not join as a junior partner if it holds more than four seats more than you. Partners stop targeting you and cover your back on track, and each brings a demand that handicaps you while they stay: starting from the back of the grid, a ballot cap, shorter drift boosts, an empty ballot box every third time, no launch boost, or no no-confidence votes. Hit a partner, or let them outrun you, and their loyalty drops until they walk out. The season ends with the count: a government, an opposition government, or a 60–60 deadlock.
+- **Single race (מרוץ בודד).** Any course, three laps, six drivers.
+- **Time trial (נגד השעון).** Race alone against a translucent ghost of your best run on that course, with a live gap to the ghost and lap splits. Every ballot box is a turbo.
+- **Daily challenge (אתגר יומי).** The date picks the course, the driver and the seed of the starting field, the same for everyone that day. Results can be shared as a line of text.
 
-This is a single-player arcade race, not multiplayer. The race winner is humorously crowned prime minister; it is not a simulation of government formation. No polls or real election outcomes are represented. This is a selected game roster, not a complete candidate list.
+## How it plays
+
+- **Driving.** The kart accelerates by itself; W/↑ adds throttle and S/↓ brakes. Steer with A/D or ←/→; physical key codes are used, so a Hebrew keyboard layout works. Press W exactly as the countdown shows 1 for a launch boost. Hold Shift with a direction to drift; release after blue, orange or purple for stronger boosts. Shift in the air is a trick, which gives a boost on landing. C switches camera; Esc/P pauses. Phones and tablets get thumb controls.
+- **Rivals race on merit.** Each AI driver produces the same inputs a player would and runs through the same physics. They take a racing line, drift through corners, collect ballots and boxes, steer around hazards they can reach in time, take shortcuts, draft, block and ram on purpose. Each leader has a temperament (tactician, anchor, charger, wall, collector, hothead). Difficulty scales their awareness, how often they drift and the boost tier they hold for. A gentle catch-up keeps the field within a few seconds.
+- **Items (קלפי).** Ballot boxes hand out items by position: leaders get defence, the back of the pack the heavy ones. Turbo, immunity, a surprise poll (hits the kart ahead), a vote magnet, a press leak (newsprint covers the screens of those ahead), a filibuster (a lectern dropped behind you), a spin doctor (reverses the steering of the kart ahead), a budget transfer (steals ballots) and a no-confidence vote (a gavel that lands on the leader through any shield).
+- **Abilities.** Every leader has a signature move, charged by drifting, tricks, near misses and slipstreams and fired with E or by tapping the portrait: super immunity, breaking news, a protest barricade, resignation (out of the coalition and back in ahead), coalition funds and a siren that clears the road.
+- **Vehicles differ.** Top speed, pick-up, grip, off-road pace and weight trade off. No vehicle tops every category.
+
+## The world
+
+Jerusalem limestone apartment blocks with roller blinds, balconies and rooftop solar water heaters; olive groves, cypresses and date palms; red-and-white kerbs in corners and blue-and-white along city streets; Jerusalem street lamps; election posters; and green Hebrew/English/Arabic overhead signs naming the districts. Landmarks: the Knesset, the Chords Bridge, Mahane Yehuda with a light-rail tram running alongside, the Montefiore windmill, and the Old City walls on the ridge. Each course has its own sky (day, dusk, night).
+
+## Code
+
+| Module | What it does |
+| --- | --- |
+| `race-model.js` | Race simulation: physics, pickups, finish times, catch-up |
+| `race-ai.js` | Rival drivers: racing line, hazard avoidance, racecraft, items, abilities |
+| `race-items.js` | Items, abilities, vehicle stats |
+| `race-course.js` | Pickup and hazard layout shared by simulation and renderer |
+| `gp.js` | The Race to 61 season: seats, talks, demands, loyalty, verdict |
+| `ghost.js` | Time-trial recording and playback |
+| `world-kit.js`, `world-set.js` | Procedural textures and props, and the dressed city |
+| `kart-world.js`, `kart-drivers.js` | Karts and drivers |
+| `kart-motion.js`, `kart-trails.js` | Kart animation, smoke, sparks and dust |
+| `kart-hud.js`, `kart-menus.js`, `ui-*.js` | HUD, ticker, menus, the Knesset chamber chart |
+| `kart-audio.js` | Synthesized engine, sound effects and music |
+| `kart.js` | Rendering, input and the game loop |
 
 ## Validation
 
-`npm test` runs original model tests and kart simulation tests. `npm run check` checks all game modules.
+- `npm test` runs the simulation tests: physics, AI behaviour, items and abilities, the Grand Prix rules, ghosts.
+- `npm run check` syntax-checks every module.
+- `npm run test:browser` plays a full race with real keyboard input in Chromium, checks the Grand Prix talks and final count, a time trial and the phone layout, and fails on any page error.
+- `npm run sim -- skilled 8` (or `casual`) runs headless races on every course and reports places, spread and hit causes. `tools/gp-sim.mjs` plays whole seasons. `tools/shoot.mjs`, `tools/flow.mjs`, `tools/modes.mjs` and `tools/perf.mjs` take screenshots and measure frame rate.
 
-Browser QA scripts under `tests/kart-*.mjs` and `tests/circuit-browser.mjs` use Playwright (the bundled runtime path can be replaced with an installed package). The additional `tests/wow-browser.mjs` drives a full race using real keyboard input and checks shortcut entries/exits, timed launch and airborne tricks. Tests cover desktop/mobile render, driver choice, drift, pause/resume, full race, results and replay. Screenshots are in `test-results/`.
+The simulation is deterministic per seed. On an Intel UHD 620 a race holds about 55–60 fps; render resolution adapts if frames run long.
+
+This is satire. The leaders are caricatures, and the vehicles, abilities, items and results are invented. Nothing here is a poll or a forecast, and the roster is a selection for the game, not a full candidate list.
 
 ## Asset sources
 
@@ -54,4 +81,4 @@ Driver portraits (cropped from the originals, stylized, and mapped onto 3D heads
 - Aryeh Deri: `אריה_דרעי_2.jpg`, רווח הפקות, CC BY-SA 3.0
 - Itamar Ben-Gvir: `Itamar_Ben_Gvir_3_(cropped).jpg`, אלון נוריאל, CC BY-SA 3.0
 
-The modified face crops are shared under the same CC BY-SA terms. All other 3D geometry, environment and vehicle customization are original procedural work. Static colored meshes are merged by material for fewer draw calls. Render pixel ratio is capped at 1.6x device pixel ratio.
+The portraits are repainted in code at load (smoothed, banded into painted tones and inked along strong edges) before being mapped onto the heads; the modified faces are shared under the same CC BY-SA terms. All other 3D geometry, textures, the city, vehicles, animation, music and sound are original procedural work generated in code.
