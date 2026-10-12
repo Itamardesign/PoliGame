@@ -181,6 +181,7 @@ export function makeEffects(scene, track, karts, reduced) {
     }
     if (e.type === 'trick') say(p, 'סטייל!', '#efb4ff');
     if (e.type === 'land') {
+      if (r.player && !reduced) shake = Math.max(shake, e.trick ? 0.16 : 0.1);
       ring(p, e.trick ? '#e2a5ff' : '#fff0ce');
       burst(p, e.trick ? '#c49bff' : '#d8cbac', e.trick ? 25 : 8);
       if (e.trick) say(p, 'נחיתה מושלמת!', '#dfadff');

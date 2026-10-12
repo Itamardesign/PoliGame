@@ -125,7 +125,12 @@ function israelFlag(w, h) {
     flagTex = new T.CanvasTexture(c);
     flagTex.colorSpace = T.SRGBColorSpace;
   }
-  return new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: flagTex, side: T.DoubleSide }));
+  const flag = new T.Mesh(
+    new T.PlaneGeometry(w, h, 10, 1),
+    new T.MeshBasicMaterial({ map: flagTex, side: T.DoubleSide })
+  );
+  flag.userData.flag = true;
+  return flag;
 }
 // A wheel is built in its own group (axle along local y), batched, then spun by the race loop.
 function wheel(
@@ -449,11 +454,18 @@ const STYLE = {
     };
   }
 };
+// The kart is a root (placed on the road) holding the wheels and a sprung body. Everything the
+// suspension should move — chassis, driver, plaques, flags, flames — lives on the body.
 export function makeKart(index, logos) {
   const p = PARTIES[index],
+    root = new T.Group(),
     g = new T.Group();
+  root.add(g);
+  g.userData = root.userData;
+  root.userData.body = g;
   g.userData.wheels = [];
   g.userData.fx = [];
+  g.userData.steerPivots = [];
   const spec = STYLE[p.style](g, p);
   // Shared cockpit: seat, column and steering wheel sit in the same place on every chassis.
   if (p.style !== 'royal') {
@@ -467,9 +479,17 @@ export function makeKart(index, logos) {
   g.add(steering);
   const [zf, zr] = spec.wheelZ || [1.1, -1.04];
   for (const x of [-1.13, 1.13]) {
-    wheel(g, x, zf, spec.wheel);
-    wheel(g, x, zr, spec.rearWheel || spec.wheel);
+    // Front wheels sit on a pivot so they can visibly steer.
+    const front = wheel(root, x, zf, spec.wheel),
+      pivot = new T.Group();
+    pivot.position.copy(front.position);
+    root.add(pivot);
+    pivot.add(front);
+    front.position.set(0, 0, 0);
+    g.userData.steerPivots.push(pivot);
+    wheel(root, x, zr, spec.rearWheel || spec.wheel);
   }
+  g.userData.wheelBase = { front: zf, rear: zr, track: 1.13 };
   const driver = makeDriver(index);
   g.add(driver);
   g.userData.driver = driver;
@@ -494,6 +514,8 @@ export function makeKart(index, logos) {
   const [fx, fy, fz] = spec.flag;
   cyl(g, 0.025, 0.025, 1.9, '#fff2cd', fx, fy + 0.95, fz);
   const flag = label(p.name, 0.88, 0.38, p.color, '#ffffff', 90);
+  flag.geometry = new T.PlaneGeometry(0.88, 0.38, 10, 1);
+  flag.userData.flag = true;
   flag.position.set(fx + 0.42, fy + 1.75, fz);
   g.add(flag);
   const shield = new T.Mesh(
@@ -502,7 +524,7 @@ export function makeKart(index, logos) {
   );
   shield.position.y = 1.6;
   shield.visible = false;
-  g.add(shield);
+  root.add(shield);
   g.userData.shield = shield;
   const flames = [];
   for (const [x, y, z] of spec.flames) {
@@ -520,9 +542,16 @@ export function makeKart(index, logos) {
   const name = label(p.short, 1.7, 0.48, '#f4f5dc', '#294330', 90);
   name.position.set(0, 4.6, 0);
   name.visible = false;
-  g.add(name);
+  root.add(name);
   g.userData.name = name;
-  return g;
+  // Every flag ripples from its pole edge (local -x); keep the rest positions for the animation.
+  g.userData.flags = [];
+  g.traverse(m => {
+    if (!m.userData.flag) return;
+    m.userData.rest = Float32Array.from(m.geometry.getAttribute('position').array);
+    g.userData.flags.push(m);
+  });
+  return root;
 }
 export function makeTrack(levelId = 'jerusalem') {
   const base = [

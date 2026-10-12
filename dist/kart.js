@@ -32,6 +32,8 @@ import { makeShortcuts, racerFrame, routeBend, buildShortcuts } from './kart-rou
 import { stepEncounters, bumpRivals } from './kart-encounters.js';
 import { makeEncounterWorld } from './kart-encounter-world.js';
 import { makeEffects } from './kart-effects.js';
+import { animateKart, resetMotion } from './kart-motion.js';
+import { makeTrails } from './kart-trails.js';
 import { KEY_ACTIONS, readControls } from './kart-input.js';
 import { LEVELS, levelById } from './kart-levels.js';
 await document.fonts.load('900 80px Heebo');
@@ -182,9 +184,10 @@ function prepareKart(g) {
     g.userData.name,
     ...g.userData.fx.map(f => f.mesh)
   ]);
-  g.userData.wheels.forEach(w => w.traverse(m => dynamic.add(m)));
+  g.userData.flags.forEach(f => dynamic.add(f));
   g.userData.head.traverse(m => dynamic.add(m));
-  batchStatic(g, dynamic);
+  // Merge the static chassis inside the sprung body so the suspension still moves it as one.
+  batchStatic(g.userData.body, dynamic);
   return g;
 }
 const portraits = [];
@@ -264,44 +267,16 @@ PARTIES.forEach((p, i) => {
   $('drivers').append(button);
 });
 thumbRenderer.dispose();
-const sparkGeometry = new T.SphereGeometry(0.055, 4, 3),
-  sparkMaterials = [
-    new T.MeshBasicMaterial({ color: '#76e8fa' }),
-    new T.MeshBasicMaterial({ color: '#ffb346' }),
-    new T.MeshBasicMaterial({ color: '#e897ff' })
-  ];
-const sparks = Array.from({ length: 38 }, () => {
-  const mesh = new T.Mesh(sparkGeometry, sparkMaterials[0]);
-  mesh.visible = false;
-  scene.add(mesh);
-  return { mesh, life: 0, v: new T.Vector3() };
-});
-let sparkIndex = 0,
-  sparkClock = 0;
-function updateSparks(dt) {
-  for (const p of sparks) {
-    if (p.life <= 0) continue;
-    p.life -= dt;
-    p.v.y -= dt * 4;
-    p.mesh.position.addScaledVector(p.v, dt);
-    p.mesh.scale.setScalar(Math.max(0, p.life * 3));
-    p.mesh.visible = p.life > 0;
-  }
-  if (state !== 'running' || reduced) return;
-  const r = race.racers[0];
-  if (!r.drifting || r.charge < 0.25) return;
-  sparkClock += dt;
-  if (sparkClock < 0.035) return;
-  sparkClock = 0;
-  for (const side of [-1, 1]) {
-    const p = sparks[sparkIndex++ % sparks.length];
-    p.life = 0.32;
-    p.mesh.visible = true;
-    p.mesh.material = sparkMaterials[r.charge > 2.4 ? 2 : r.charge > 1.6 ? 1 : 0];
-    p.mesh.position.copy(karts[r.id].localToWorld(new T.Vector3(side * 1.1, 0.35, -1.2)));
-    const t = track.at(r.s).t;
-    p.v.set(-t.x * 3 + side * 2, 1.3, -t.z * 3);
-  }
+const trails = makeTrails(scene, reduced);
+// Smoke, sparks and dust for every kart close enough to the camera to see it.
+function updateTrails(dt) {
+  if (race && (state === 'running' || state === 'results'))
+    for (const r of race.racers) {
+      const kart = karts[r.id];
+      const near = kart.position.distanceToSquared(camera.position) < 90 * 90;
+      trails.kartTrail(kart, r, dt, Math.abs(r.x) > (r.routeId ? 2.1 : ROAD.driveEdge), near);
+    }
+  trails.update(dt);
 }
 const pickups = [];
 const templates = Object.fromEntries(
@@ -367,9 +342,11 @@ function renderLevels() {
 function start() {
   clearControls();
   fx.reset();
+  trails.reset();
   seenEvent = 0;
   launchPressed = 99;
   race = makeRace(selected, level.difficulty, Date.now(), track.length, track.shortcuts, level.id, { bend });
+  karts.forEach(resetMotion);
   state = 'countdown';
   count = 3.5;
   previousRank = 6;
@@ -443,7 +420,12 @@ function consumeEvents() {
     if (e.seq <= seenEvent) continue;
     seenEvent = e.seq;
     // Effects for rivals only play when they happen near the player's kart.
-    if (e.player || Math.abs(e.s - race.racers[0].s) < 90) fx.event(e, race);
+    if (e.player || Math.abs(e.s - race.racers[0].s) < 90) {
+      fx.event(e, race);
+      const kart = karts[e.id];
+      if (e.type === 'land') trails.puff(kart.position, '#d9ccad', e.trick ? 18 : 10, e.trick ? 5 : 3.5);
+      if (e.type === 'hit') trails.puff(kart.position.clone().setY(kart.position.y + 0.8), '#f1d9c2', 16, 5);
+    }
     const me = e.id === selected;
     if (e.type === 'poll-fired' && e.target === selected) {
       feedback('סקר בדרך אליכם! הפעילו חסינות', 'danger');
@@ -508,42 +490,22 @@ function consumeEvents() {
 }
 function updateKarts(dt) {
   if (!race) return;
+  const ctx = { elapsed, reduced, camera };
   for (const r of race.racers) {
-    const kart = karts[r.id],
-      { p, t } = racerFrame(track, r);
-    kart.position.copy(p);
-    const jump = r.air > 0 ? Math.sin((1 - r.air / r.airTotal) * Math.PI) * 3.2 : 0;
-    kart.position.y += jump + (r.hop > 0 ? Math.sin((r.hop / 0.23) * Math.PI) * 0.3 : 0);
-    kart.position.y += reduced ? 0 : Math.sin(elapsed * 17 + r.id) * 0.018;
-    kart.rotation.x = Math.atan2(-t.y, Math.hypot(t.x, t.z));
-    const steer = r.steer;
-    kart.rotation.set(
-      Math.atan2(-t.y, Math.hypot(t.x, t.z)),
-      Math.atan2(t.x, t.z) + (r.drifting ? -steer * 0.38 : -steer * 0.16),
-      -steer * 0.055
-    );
-    if (r.stun > 0 && !reduced) kart.rotation.y += Math.sin((1 - r.stun / 1.8) * Math.PI * 3) * 0.95;
-    if (r.trick && r.air > 0 && !reduced) kart.rotation.y += (1 - r.air / r.airTotal) * Math.PI * 2;
-    kart.userData.head.rotation.z = reduced ? 0 : Math.sin(elapsed * 4 + r.id) * 0.03 - r.steer * 0.045;
-    kart.userData.head.rotation.y = -r.steer * 0.15 + (r.player ? 0 : Math.sin(elapsed * 0.8 + r.id) * 0.06);
-    for (const eye of kart.userData.eyes) eye.scale.y = (elapsed + r.id * 0.7) % 4.7 < 0.13 ? 0.12 : 1;
-    kart.scale.setScalar(1);
-    kart.userData.wheels.forEach(w => (w.rotation.x += r.speed * dt * 1.5));
+    const kart = karts[r.id];
+    animateKart(kart, r, racerFrame(track, r), dt, ctx);
     kart.userData.shield.visible = r.shield > 0 || r.magnet > 0;
     kart.userData.shield.material.color.set(r.shield > 0 ? '#80e8fa' : '#ee8ce0');
     kart.userData.shield.material.opacity = 0.12 + Math.sin(elapsed * 6) * 0.035;
-    kart.userData.flames.forEach(f => {
-      f.visible = r.boost > 0;
-      f.scale.y = 1 + Math.sin(elapsed * 37) * 0.24;
-    });
     for (const f of kart.userData.fx)
       f.mesh.visible = reduced || Math.floor(elapsed * f.rate + (f.phase || 0)) % 2 === 0;
-    kart.visible = !(r.hitCooldown > 0 && r.stun > 0 && Math.floor(elapsed * 12) % 2 === 0);
+    kart.visible = true;
     kart.userData.name.visible = !r.player;
     kart.userData.name.quaternion.copy(camera.quaternion).premultiply(kart.quaternion.clone().invert());
   }
 }
 const camTarget = new T.Vector3();
+let camSwing = 0;
 function setCamera(snap = false, dt = 1 / 60) {
   world.userData.gantry.visible = state !== 'home';
   let position, look;
@@ -556,6 +518,9 @@ function setCamera(snap = false, dt = 1 / 60) {
       const data = track.at(i === selected ? 8 : 23 + (i % 3) * 5, i === selected ? -1 : i % 2 ? 3 : -3);
       k.position.copy(data.p);
       k.rotation.set(0, Math.atan2(data.t.x, data.t.z) + Math.PI + (i === selected ? -0.2 : 0), 0);
+      k.userData.body.rotation.set(0, 0, 0);
+      k.userData.body.position.y = 0;
+      k.userData.body.scale.setScalar(1);
     });
     const focus = featured.position.clone(),
       mobile = innerWidth <= 650;
@@ -570,6 +535,12 @@ function setCamera(snap = false, dt = 1 / 60) {
     look = ahead.p.clone();
     look.y += 1.0;
     if (r.boost > 0 && !reduced) position.addScaledVector(a.t, -1);
+    // In a drift the camera swings to the outside so the slide angle reads; jumps lift it a touch.
+    const swingTarget = reduced ? 0 : r.drifting ? r.steer * 2.4 : r.steer * 0.6;
+    camSwing += (swingTarget - camSwing) * -Math.expm1(-dt * 3);
+    position.addScaledVector(a.right, camSwing);
+    look.addScaledVector(a.right, camSwing * 0.35);
+    if (r.air > 0) position.y += Math.sin((1 - r.air / r.airTotal) * Math.PI) * 1.4;
   }
   if (!position) return;
   camera.position.lerp(position, snap ? 1 : -Math.expm1(-8 * dt));
@@ -594,6 +565,7 @@ function setCamera(snap = false, dt = 1 / 60) {
 function resize() {
   const rect = arena.getBoundingClientRect();
   renderer.setSize(rect.width, rect.height, false);
+  trails.resize(rect.height * renderer.getPixelRatio());
   camera.aspect = rect.width / rect.height;
   camera.fov = innerWidth <= 650 ? (state === 'home' ? 47 : 54) : 46;
   camera.updateProjectionMatrix();
@@ -856,7 +828,7 @@ function frame(now) {
       Math.floor(Math.max(0, race?.racers[0].s || 0) / track.length)
     );
     fx.update(dt, state === 'home' ? null : race);
-    updateSparks(dt);
+    updateTrails(dt);
     setCamera(false, dt);
     for (const p of pickups) {
       if (p.type === 'box' || p.type === 'coin') {

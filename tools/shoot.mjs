@@ -28,14 +28,24 @@ if (shots.includes(0)) await page.screenshot({ path: `${out}/${tag}-home.png` })
 await page.locator('#play').click();
 await page.waitForFunction(() => readKartState().state === 'running', null, { timeout: 20000 });
 await page.keyboard.down('KeyW');
-let held = null;
+let held = null,
+  shiftHeld = false;
 const taken = new Set();
+let fps = null;
 const t0 = Date.now();
 while (true) {
   const st = await page.evaluate(() => {
     const s = readKartState();
     const p = s.race.racers[0];
-    return { state: s.state, time: s.race.time, x: p.x, rank: s.race.rank, lateral: p.lateral };
+    return {
+      state: s.state,
+      time: s.race.time,
+      x: p.x,
+      rank: s.race.rank,
+      lateral: p.lateral,
+      charge: p.charge,
+      drifting: p.drifting
+    };
   });
   if (st.state !== 'running') break;
   // Simple lane keeper: aim for the centre line, steering with the arrow keys.
@@ -47,11 +57,31 @@ while (true) {
     held = key;
   }
   if (Math.random() < 0.05) await page.keyboard.press('Space');
+  // Drift in bursts: hold Shift for ~1.5 s whenever steering, then release for the boost.
+  const wantDrift = !!key && st.time % 5 < 1.6;
+  if (wantDrift !== shiftHeld) {
+    await (wantDrift ? page.keyboard.down('ShiftLeft') : page.keyboard.up('ShiftLeft'));
+    shiftHeld = wantDrift;
+  }
   for (const t of shots)
     if (Number.isFinite(t) && t > 0 && st.time >= t && !taken.has(t)) {
       taken.add(t);
       await page.screenshot({ path: `${out}/${tag}-t${t}.png` });
     }
+  if (fps === null && st.time > 6) {
+    fps = await page.evaluate(
+      () =>
+        new Promise(done => {
+          let n = 0;
+          const start = performance.now();
+          const tick = () => (
+            ++n, performance.now() - start < 2000 ? requestAnimationFrame(tick) : done(n / 2)
+          );
+          requestAnimationFrame(tick);
+        })
+    );
+    console.log('fps', fps, 'drawCalls', await page.evaluate(() => readKartState().renderCalls));
+  }
   if (Date.now() - t0 > 420000) break;
   await page.waitForTimeout(40);
 }
