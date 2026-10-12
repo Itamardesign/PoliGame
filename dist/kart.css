@@ -1827,3 +1827,15 @@ dialog#info kbd {
     min-height: 46px;
   }
 }
+
+/* Cinematic moments: the HUD steps aside for the intro flyover and the finish. */
+.arena.cinematic .hud > :not(.ticker),
+.arena.cinematic .touch {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.arena.cinematic .vignette {
+  box-shadow:
+    inset 0 90px 60px -40px rgb(0 0 0 / 0.7),
+    inset 0 -90px 60px -40px rgb(0 0 0 / 0.7);
+}

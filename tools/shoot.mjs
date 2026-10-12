@@ -27,6 +27,9 @@ const tag = `${level}-${w}x${h}`;
 if (shots.includes(0)) await page.screenshot({ path: `${out}/${tag}-home.png` });
 await page.locator('[data-mode="single"]').click();
 await page.locator('#play').click();
+await page.waitForFunction(() => readKartState().state === 'intro', null, { timeout: 20000 });
+await page.waitForTimeout(1500);
+await page.screenshot({ path: `${out}/${tag}-intro.png` });
 await page.waitForFunction(() => readKartState().state === 'running', null, { timeout: 20000 });
 await page.keyboard.down('KeyW');
 let held = null,
@@ -48,6 +51,11 @@ while (true) {
       drifting: p.drifting
     };
   });
+  if (st.state === 'finishing') {
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${out}/${tag}-finishing.png` });
+    break;
+  }
   if (st.state !== 'running') break;
   // Simple lane keeper: aim for the centre line, steering with the arrow keys.
   const want = -st.x * 0.35 - st.lateral * 0.12;

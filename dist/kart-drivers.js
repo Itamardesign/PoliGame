@@ -226,6 +226,32 @@ if (typeof document !== 'undefined')
       } catch {}
     })
   );
+function stylize(ctx, w, h) {
+  const img = ctx.getImageData(0, 0, w, h),
+    d = img.data,
+    lum = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) lum[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11;
+  const levels = 9,
+    step = 255 / (levels - 1);
+  for (let y = 1; y < h - 1; y++)
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      // Sobel edge strength on luminance.
+      const gx =
+        lum[i - w + 1] + 2 * lum[i + 1] + lum[i + w + 1] - lum[i - w - 1] - 2 * lum[i - 1] - lum[i + w - 1];
+      const gy =
+        lum[i + w - 1] + 2 * lum[i + w] + lum[i + w + 1] - lum[i - w - 1] - 2 * lum[i - w] - lum[i - w + 1];
+      const edge = Math.min(1, Math.max(0, (Math.hypot(gx, gy) - 70) / 120));
+      for (let k = 0; k < 3; k++) {
+        const v = d[i * 4 + k],
+          banded = Math.round(v / step) * step;
+        // Mostly painted bands, a little of the original to keep likeness in the gradients.
+        const painted = banded * 0.62 + v * 0.38;
+        d[i * 4 + k] = painted * (1 - edge * 0.45) + [62, 38, 30][k] * edge * 0.45;
+      }
+    }
+  ctx.putImageData(img, 0, 0);
+}
 function faceMaterial(id) {
   const img = photos.get(id);
   if (!img) return new T.MeshStandardMaterial({ color: FACES[id].skin, roughness: 0.8 });
@@ -233,14 +259,13 @@ function faceMaterial(id) {
   const c = document.createElement('canvas');
   c.width = img.naturalWidth;
   c.height = img.naturalHeight;
-  const x = c.getContext('2d');
-  x.filter = 'saturate(1.18) contrast(1.06) brightness(1.03)';
+  const x = c.getContext('2d', { willReadFrequently: true });
+  // Paint the photo rather than paste it: smooth away photographic grain, settle tones into
+  // a few painted bands and ink the strongest features, so faces sit in the stylized world.
+  x.filter = 'blur(1.6px) saturate(1.2) contrast(1.08) brightness(1.04)';
   x.drawImage(img, 0, 0);
-  x.globalAlpha = 0.55;
-  x.filter = 'blur(2px) saturate(1.2)';
-  x.drawImage(img, 0, 0);
-  x.globalAlpha = 1;
   x.filter = 'none';
+  stylize(x, c.width, c.height);
   x.globalCompositeOperation = 'destination-in';
   x.save();
   x.translate(c.width / 2, c.height / 2);

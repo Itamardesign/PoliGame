@@ -144,6 +144,17 @@ export function animateKart(kart, r, frame, dt, ctx) {
     }
   }
 
+  // Steering wheel follows the driver's hands; reactions show what just happened to this kart.
+  const sw = kart.userData.steeringWheel;
+  if (sw) sw.rotation.z += (-r.steer * 1.4 - sw.rotation.z) * Math.min(1, dt * 14);
+  const react = kart.userData.reactions;
+  if (react) {
+    react.stars.visible = r.stun > 0;
+    react.stars.rotation.y = ctx.elapsed * 6;
+    react.swirl.visible = r.confused > 0;
+    react.swirl.rotation.z = -ctx.elapsed * 5;
+    react.paper.visible = r.blind > 0;
+  }
   // Boost flames flicker and stretch with the remaining boost.
   for (const f of kart.userData.flames) {
     f.visible = r.boost > 0;

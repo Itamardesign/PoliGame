@@ -476,10 +476,15 @@ export function makeKart(index, logos) {
     box(g, 1.15, 0.95, 0.22, '#2a2f33', 0, 1.48, -0.62);
   }
   rod(g, [0, 1.05, 1.0], [0, 1.42, 0.68], 0.05, '#2b3434');
+  // The steering wheel sits on a tilted column pivot so it can turn with the driver's input.
+  const column = new T.Group();
+  column.position.set(0, 1.42, 0.65);
+  column.rotation.x = -0.7;
+  g.add(column);
   const steering = new T.Mesh(new T.TorusGeometry(0.39, 0.065, 8, 20), mat('#2b3434'));
-  steering.position.set(0, 1.42, 0.65);
-  steering.rotation.x = -0.7;
-  g.add(steering);
+  steering.add(new T.Mesh(new T.BoxGeometry(0.7, 0.06, 0.05), mat('#2b3434')));
+  column.add(steering);
+  g.userData.steeringWheel = steering;
   const [zf, zr] = spec.wheelZ || [1.1, -1.04];
   for (const x of [-1.13, 1.13]) {
     // Front wheels sit on a pivot so they can visibly steer.
@@ -498,6 +503,8 @@ export function makeKart(index, logos) {
   g.userData.driver = driver;
   g.userData.head = driver.userData.head;
   g.userData.eyes = driver.userData.eyes;
+  g.userData.reactions = makeReactions(driver.userData.head, spec);
+  g.add(g.userData.reactions.paper);
   // Front and rear campaign plaques carry the actual downloaded party logos.
   for (const front of [true, false]) {
     const z = front ? spec.front : spec.rear,
@@ -701,4 +708,34 @@ export function makePickup(type) {
       }
   }
   return g;
+}
+
+// Visible reactions a rival can read at a glance: dizzy stars after a hit, a purple swirl when
+// the steering is reversed, and a newspaper plastered over the windscreen after a leak.
+function makeReactions(head, spec) {
+  const stars = new T.Group();
+  const starMat = new T.MeshBasicMaterial({ color: '#ffd84a' });
+  for (let i = 0; i < 3; i++) {
+    const star = new T.Mesh(new T.OctahedronGeometry(0.16, 0), starMat);
+    star.scale.set(1, 1, 0.45);
+    const a = (i / 3) * Math.PI * 2;
+    star.position.set(Math.cos(a) * 0.75, 0, Math.sin(a) * 0.75);
+    stars.add(star);
+  }
+  stars.position.y = 1.05;
+  stars.visible = false;
+  head.add(stars);
+  const swirl = new T.Mesh(
+    new T.TorusGeometry(0.55, 0.06, 6, 24, Math.PI * 1.6),
+    new T.MeshBasicMaterial({ color: '#b07cff' })
+  );
+  swirl.rotation.x = Math.PI / 2;
+  swirl.position.y = 1.15;
+  swirl.visible = false;
+  head.add(swirl);
+  const paper = label('מבזק! הדלפה', 1.5, 0.95, '#f3efe4', '#1b1d22', 70);
+  paper.position.set(0, 1.55, (spec.front ?? 2) * 0.45);
+  paper.rotation.x = -0.35;
+  paper.visible = false;
+  return { stars, swirl, paper };
 }

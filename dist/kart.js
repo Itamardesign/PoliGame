@@ -132,7 +132,9 @@ let selected = clamp(Number(stored('ck-driver', '0')) || 0, 0, PARTIES.length - 
   hudClock = 0,
   lastLap = 0,
   playerHits = {},
-  stateBeforePause = 'running';
+  stateBeforePause = 'running',
+  introT = 0,
+  finishT = 0;
 let sensitivity = clamp(Number(stored('ck-steering', '1')) || 1, 0.65, 1.35),
   wideCamera = stored('ck-camera', 'wide') === 'wide';
 if (gp && gp.player !== undefined && mode === 'gp' && !gp.done) selected = gp.player;
@@ -203,9 +205,11 @@ function callout(text, kind = '') {
 }
 
 function prepareKart(g) {
-  const eyeMeshes = new Set();
-  g.userData.eyes.forEach(eye => eye.traverse(m => eyeMeshes.add(m)));
-  batchStatic(g.userData.head, eyeMeshes);
+  // Eyes and the reaction props (stars, swirl) must stay separate so they can animate and hide.
+  const headKeep = new Set();
+  g.userData.eyes.forEach(eye => eye.traverse(m => headKeep.add(m)));
+  for (const part of Object.values(g.userData.reactions)) part.traverse(m => headKeep.add(m));
+  batchStatic(g.userData.head, headKeep);
   const dynamic = new Set([
     g.userData.shield,
     ...g.userData.flames,
@@ -213,6 +217,8 @@ function prepareKart(g) {
     ...g.userData.fx.map(f => f.mesh)
   ]);
   g.userData.flags.forEach(f => dynamic.add(f));
+  g.userData.steeringWheel.traverse(m => dynamic.add(m));
+  for (const part of Object.values(g.userData.reactions)) part.traverse(m => dynamic.add(m));
   g.userData.head.traverse(m => dynamic.add(m));
   // Merge the static chassis inside the sprung body so the suspension still moves it as one.
   batchStatic(g.userData.body, dynamic);
@@ -453,14 +459,17 @@ function startRace_() {
   });
   karts.forEach(resetMotion);
   karts.forEach(k => k.scale.setScalar(1));
-  state = 'countdown';
+  state = reduced ? 'countdown' : 'intro';
+  introT = 0;
   count = 3.5;
   previousRank = 6;
   pickups.forEach(p => (p.mesh.visible = true));
   confetti.forEach(p => scene.remove(p.mesh));
   confetti = [];
   for (const id of ['home', 'results', 'pauseScreen', 'talks', 'final']) $(id).classList.add('hidden');
-  for (const id of ['hud', 'countdown', 'raceHint']) $(id).classList.remove('hidden');
+  for (const id of ['hud', 'raceHint']) $(id).classList.remove('hidden');
+  $('countdown').classList.toggle('hidden', state === 'intro');
+  arena.classList.toggle('cinematic', state === 'intro');
   $('touch').classList.toggle('hidden', !touchDevice());
   $('coalitionMeter').classList.toggle('hidden', !inGp);
   arena.classList.add('racing');
@@ -515,7 +524,7 @@ function goHome() {
   $('play').focus({ preventScroll: true });
 }
 function pause() {
-  if (!['running', 'countdown'].includes(state)) return;
+  if (!['running', 'countdown', 'intro'].includes(state)) return;
   stateBeforePause = state;
   state = 'paused';
   clearControls();
@@ -740,7 +749,7 @@ function updateKarts(dt) {
     for (const f of kart.userData.fx)
       f.mesh.visible = reduced || Math.floor(elapsed * f.rate + (f.phase || 0)) % 2 === 0;
     kart.visible = true;
-    kart.userData.name.visible = !r.player;
+    kart.userData.name.visible = !r.player && (state === 'running' || state === 'countdown');
     kart.userData.name.quaternion.copy(camera.quaternion).premultiply(kart.quaternion.clone().invert());
   }
 }
@@ -777,6 +786,33 @@ function setCamera(snap = false, dt = 1 / 60) {
       .addScaledVector(side, Math.sin(orbit) * radius);
     position.y += portrait ? 8 : 6.5;
     look = focus.clone().add(new T.Vector3(0, portrait ? -3.4 : short ? 0.4 : 2.2, 0));
+  } else if (state === 'intro') {
+    // Sweep in from high over the grid to the usual chase position behind the player.
+    const r = race.racers[0],
+      a = racerFrame(track, r),
+      u = Math.min(1, introT / INTRO_TIME),
+      e = 1 - (1 - u) ** 3;
+    // Out front and off to the side, high, then around and down behind the grid: the side
+    // offset and the height decay late so the camera never passes through the start gantry.
+    const back = wideCamera ? 14.2 : 10.5;
+    position = a.p
+      .clone()
+      .addScaledVector(a.t, 40 - (40 + back) * e)
+      .addScaledVector(a.right, -26 * (1 - e) ** 0.6);
+    position.y += (wideCamera ? 7.8 : 5.8) + 20 * (1 - e) ** 0.7;
+    look = a.p.clone().addScaledVector(a.t, 6 + 6 * e);
+    look.y += 1;
+    snap = true;
+  } else if (state === 'finishing' || state === 'results') {
+    const k = karts[race.racers[0].id],
+      t = state === 'finishing' ? finishT * 0.5 : finishT * 0.5 + elapsed * 0.05;
+    const r = racerFrame(track, race.racers[0]);
+    position = k.position
+      .clone()
+      .addScaledVector(r.t, Math.cos(t + 2.4) * 9)
+      .addScaledVector(r.right, Math.sin(t + 2.4) * 9);
+    position.y += 3.4;
+    look = k.position.clone().add(new T.Vector3(0, 1.6, 0));
   } else {
     const r = race.racers[0],
       a = racerFrame(track, r),
@@ -805,7 +841,9 @@ function setCamera(snap = false, dt = 1 / 60) {
       ? innerHeight > innerWidth
         ? 58
         : 42
-      : (compact() ? 60 : wideCamera ? 55 : 49) + (race.racers[0].boost > 0 && !reduced ? 5 : 0);
+      : state === 'finishing' || state === 'results'
+        ? 40
+        : (compact() ? 60 : wideCamera ? 55 : 49) + (race.racers[0].boost > 0 && !reduced ? 5 : 0);
   camera.fov += (desiredFov - camera.fov) * (snap ? 1 : -Math.expm1(-dt * 5));
   camera.updateProjectionMatrix();
   const focus = state === 'home' || !race ? karts[selected].position : racerFrame(track, race.racers[0]).p;
@@ -822,6 +860,13 @@ function resize() {
 new ResizeObserver(resize).observe(arena);
 resize();
 
+const INTRO_TIME = 3.4;
+function beginCountdown() {
+  if (state !== 'intro') return;
+  state = 'countdown';
+  arena.classList.remove('cinematic');
+  $('countdown').classList.remove('hidden');
+}
 function updateHUD() {
   const position = hud.update(race, {
     selected,
@@ -888,11 +933,33 @@ function frame(now) {
       tone(850, 0.25);
     }
     if (race.time > 7) $('raceHint').classList.add('hidden');
-    if (race.done) finish();
+    if (race.done) {
+      state = 'finishing';
+      finishT = 0;
+      const place = ranking(race).indexOf(race.racers[0]) + 1;
+      callout(place === 1 ? 'ניצחון!' : 'סיום · מקום ' + place, place === 1 ? 'gold' : '');
+      arena.classList.add('cinematic');
+      $('touch').classList.add('hidden');
+      tone(place === 1 ? 1000 : 600, 0.4);
+    }
+  }
+  if (state === 'intro') {
+    introT += dt;
+    if (introT > INTRO_TIME) beginCountdown();
+  }
+  // Slow motion over the line, then the results.
+  const slow = state === 'finishing' ? 0.35 : 1;
+  if (state === 'finishing') {
+    finishT += dt;
+    coastRace(race, dt * slow);
+    if (finishT > 2.6) {
+      arena.classList.remove('cinematic');
+      finish();
+    }
   }
   if (state === 'results' && race) coastRace(race, dt);
-  if (race && ['countdown', 'running', 'results', 'paused'].includes(state) && state !== 'paused')
-    updateKarts(dt);
+  if (race && ['intro', 'countdown', 'running', 'finishing', 'results'].includes(state))
+    updateKarts(dt * slow);
   updateEngine();
   if (state !== 'paused') {
     encounters.update(
@@ -963,6 +1030,7 @@ $('abandonSeason').onclick = () => {
   refreshResumeCard();
 };
 for (const b of document.querySelectorAll('.mode')) b.onclick = () => setMode(b.dataset.mode);
+arena.addEventListener('pointerdown', () => state === 'intro' && beginCountdown());
 canvas.addEventListener('pointerup', e => {
   if (e.pointerType !== 'mouse' && touchDevice() && state === 'running' && race?.racers[0].item)
     activateItem();
@@ -990,6 +1058,7 @@ $('fullscreen').onclick = async () => {
 const commandCodes = new Set(['Space', 'Escape', 'KeyP', 'KeyC', 'KeyE']);
 addEventListener('keydown', e => {
   if ($('info').open || e.target instanceof HTMLInputElement) return;
+  if (state === 'intro') return beginCountdown();
   if (state === 'home' && e.code === 'Enter' && document.activeElement === document.body) return play();
   if (
     !['running', 'countdown', 'paused'].includes(state) ||
@@ -1113,5 +1182,6 @@ if (params.get('qa') === '1')
     },
     showTalks,
     showFinal,
-    goHome
+    goHome,
+    faces: faceImages
   };
