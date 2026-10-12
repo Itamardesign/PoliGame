@@ -158,10 +158,13 @@ function chooseLine(race, r, dt) {
   // Racecraft: overtake around a slower car, draft, block the one behind, ram while boosting.
   if (r.boost <= 0) brain.ram = null;
   else brain.ram ??= race.random() < P.aggression * 0.2;
+  const partner = race.coalition?.has(r.id),
+    player = race.racers.find(o => o.player);
   for (const o of race.racers) {
     if (o === r || o.finish !== null || o.routeId) continue;
     const gap = o.s - r.s,
-      dx = o.x - x;
+      dx = o.x - x,
+      friend = partner && race.coalition.has(o.id);
     if (
       gap > 0 &&
       gap < (r.boost > 0 ? 16 : 9) &&
@@ -171,9 +174,27 @@ function chooseLine(race, r, dt) {
     )
       x = o.x + (o.x > 0 ? -2.8 : 2.8);
     else if (gap > 4 && gap < 16 && Math.abs(dx) < 4 && r.boost <= 0) x += dx * 0.35;
-    if (brain.ram && gap > 1 && gap < 14) x = o.x;
-    if (gap < -3 && gap > -14 && P.block > 0.5 && rankOf(race, r) <= 3 && (o.player || P.block > 0.85))
+    if (brain.ram && gap > 1 && gap < 14 && !friend) x = o.x;
+    if (
+      gap < -3 &&
+      gap > -14 &&
+      !friend &&
+      P.block > 0.5 &&
+      rankOf(race, r) <= 3 &&
+      (o.player || P.block > 0.85)
+    )
       x += (o.x - x) * 0.45 * P.block;
+    // A coalition partner just behind the player sits on the line of whoever is chasing them.
+    if (
+      partner &&
+      player &&
+      !friend &&
+      player.s - r.s > 0 &&
+      player.s - r.s < 18 &&
+      o.s < player.s &&
+      o.s > r.s - 10
+    )
+      x += (o.x - x) * 0.6;
   }
 
   // Occasional lapses keep the pack from looking robotic; a leaked headline over the windscreen

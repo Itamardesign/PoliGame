@@ -1,5 +1,5 @@
 // Campaign items, leader abilities and vehicle stats. Pure simulation: no rendering here.
-import { emitRace, ranking, hitRacer, clamp } from './race-model.js';
+import { emitRace, ranking, hitRacer, clamp, allied } from './race-model.js';
 
 export const ITEMS = {
   boost: { name: 'טורבו הבטחות', short: 'טורבו', glyph: '↯' },
@@ -37,12 +37,15 @@ export function grantItem(race, racer) {
     }
   }
   racer.item ??= 'boost';
+  if (racer.player && racer.item === 'noconf' && race.handicap.noNoconf) racer.item = 'boost';
   emitRace(race, 'item-get', racer, { item: racer.item });
 }
 
+// Rivals never aim at their coalition partners; the player can, at a cost to loyalty.
 const ahead = (race, racer, range) =>
   race.racers
     .filter(r => r !== racer && r.finish === null && r.s > racer.s && r.s - racer.s < range)
+    .filter(r => racer.player || !allied(race, racer, r))
     .sort((a, b) => a.s - b.s);
 
 export function useItem(race, racer) {
@@ -157,7 +160,7 @@ export function stepDrops(race) {
       if (r.prevS < d.s && r.s >= d.s && Math.abs(r.x - d.x) < 1.7) {
         d.hit = true;
         hitRacer(r, race, d.kind);
-        emitRace(race, 'drop-hit', r, { drop: d.id });
+        emitRace(race, 'drop-hit', r, { drop: d.id, from: d.owner });
         break;
       }
     }

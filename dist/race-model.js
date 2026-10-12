@@ -150,7 +150,7 @@ export function makeRace(
   const random = rng(seed);
   const order = [party, ...PARTIES.map((_, i) => i).filter(i => i !== party)];
   const bend = options.bend ?? (() => 0);
-  return {
+  const race = {
     time: 0,
     length,
     difficulty,
@@ -164,6 +164,10 @@ export function makeRace(
     projectiles: [],
     drops: [],
     dropSeq: 0,
+    // Grand Prix: parties allied with the player, and the handicaps their demands impose.
+    coalition: new Set(options.coalition ?? []),
+    handicap: options.handicap ?? {},
+    boxes: 0,
     done: false,
     used: 0,
     drifts: 0,
@@ -210,7 +214,18 @@ export function makeRace(
       brain: i === 0 ? null : makeBrain(id, random)
     }))
   };
+  if (race.handicap.grid) {
+    // The player gives up pole: swap grid slots with the last car.
+    const p = race.racers[0],
+      last = race.racers.at(-1);
+    [p.s, last.s] = [last.s, p.s];
+    [p.prevS, last.prevS] = [last.prevS, p.prevS];
+    [p.x, last.x] = [last.x, p.x];
+  }
+  return race;
 }
+// Coalition partners (and the player) do not target each other on purpose.
+export const allied = (race, a, b) => a !== b && race.coalition.has(a.id) && race.coalition.has(b.id);
 export function ranking(race) {
   const time = r => r.finish ?? r.projected;
   return [...race.racers].sort((a, b) =>
@@ -264,7 +279,7 @@ export function hitRacer(racer, race = null, cause = 'hazard') {
 export function startRace(race, playerLaunch = false) {
   for (const r of race.racers) {
     const good = r.player
-      ? playerLaunch
+      ? playerLaunch && !race.handicap.noLaunch
       : race.random() < { normal: 0.35, hard: 0.55, insane: 0.75 }[race.difficulty] * r.skill;
     if (good) {
       r.boost = Math.max(r.boost, 1.9);
@@ -288,6 +303,9 @@ function collect(race, r, p) {
   } else if (p.type === 'box') {
     if (r.item) return;
     p.hiddenUntil = race.time + RESPAWN.box;
+    // A partner's veto: every few boxes the player opens come up empty.
+    if (r.player && race.handicap.vetoEvery && ++race.boxes % race.handicap.vetoEvery === 0)
+      return void emitRace(race, 'veto', r);
     grantItem(race, r);
   } else if (p.type === 'ramp') launch(race, r);
   else if (p.type === 'boost') {
@@ -407,7 +425,8 @@ export function stepRace(race, dt, input = {}, curve = 0) {
     }
     if (wasDrifting && !r.drifting) {
       if (r.charge > 0.65) {
-        r.boost = Math.max(r.boost, r.charge > 2.4 ? 3 : r.charge > 1.6 ? 1.9 : 1.1);
+        const scale = r.player ? (race.handicap.driftScale ?? 1) : 1;
+        r.boost = Math.max(r.boost, (r.charge > 2.4 ? 3 : r.charge > 1.6 ? 1.9 : 1.1) * scale);
         if (r.player) race.drifts++;
         emitRace(race, 'drift-boost', r, { tier: r.charge > 2.4 ? 3 : r.charge > 1.6 ? 2 : 1 });
       }
@@ -415,7 +434,8 @@ export function stepRace(race, dt, input = {}, curve = 0) {
     }
 
     const stats = r.stats ?? STATS[0];
-    let target = BASE_SPEED + stats.top + Math.min(r.coins, 10) * stats.ballot;
+    const ballots = Math.min(r.coins, r.player ? (race.handicap.ballotCap ?? 10) : 10);
+    let target = BASE_SPEED + stats.top + ballots * stats.ballot;
     if (control.accelerate && !control.brake) target += 3;
     if (!r.player) {
       target += (PACE[race.difficulty] ?? PACE.normal) + (r.skill - 1) * 30;

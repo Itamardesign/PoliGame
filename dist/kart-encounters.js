@@ -36,8 +36,12 @@ function crossEncounters(race, p, before) {
 }
 // A boosting kart closing in hard spins the one it hits, if it meant to: the player always does,
 // rivals only when they have lined up a ram. Accidental contact is just a bump.
-const rams = (a, b) =>
-  a.boost > 0 && b.boost <= 0 && a.speed - b.speed > 5 && (a.player || !a.brain || a.brain.ram);
+const rams = (a, b, race) =>
+  !(a.brain && race.coalition?.has(a.id) && race.coalition.has(b.id)) &&
+  a.boost > 0 &&
+  b.boost <= 0 &&
+  a.speed - b.speed > 5 &&
+  (a.player || !a.brain || a.brain.ram);
 export function bumpRivals(race) {
   const racers = race.racers,
     contacts = (race.bumpTimes ??= new Map());
@@ -57,9 +61,9 @@ export function bumpRivals(race) {
           ? a
           : b.star > 0 && !(a.star > 0)
             ? b
-            : rams(a, b)
+            : rams(a, b, race)
               ? a
-              : rams(b, a)
+              : rams(b, a, race)
                 ? b
                 : null;
       // Heavier karts give way less: share of the separation each kart takes.
