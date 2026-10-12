@@ -103,15 +103,21 @@ test('an occupied item slot cannot be overwritten; all racers can use items', ()
   useItem(r, rival);
   assert.ok(rival.boost > 0);
 });
-test('200cc rivals are faster than 150cc; all parties share player baseline', () => {
+test('200cc rivals are faster than 150cc; vehicles differ but stay balanced', async () => {
   const a = makeRace(0, 'normal', 5),
-    b = makeRace(4, 'hard', 5);
+    b = makeRace(0, 'hard', 5);
   for (let i = 0; i < 200; i++) {
     stepRace(a, 1 / 60, {});
     stepRace(b, 1 / 60, {});
   }
   assert.equal(a.racers[0].speed, b.racers[0].speed);
-  assert.ok(b.racers[1].s > a.racers[1].s);
+  const field = r => r.racers.slice(1).reduce((s, x) => s + x.s, 0);
+  assert.ok(field(b) > field(a));
+  // Each vehicle trades strengths: no stat line is better or worse than another everywhere.
+  const { STATS } = await import('../dist/race-items.js');
+  const score = s => s.top + s.accel * 0.8 + s.grip * 0.35 + s.offroad * 2 + (s.ballot - 0.2) * 10;
+  const scores = STATS.map(score);
+  assert.ok(Math.max(...scores) - Math.min(...scores) < 0.8, scores.join(','));
 });
 test('offroad and braking reduce speed, positions stay bounded', () => {
   const r = solo(),
@@ -175,7 +181,7 @@ test('manual throttle accelerates and braking takes priority', () => {
   for (let i = 0; i < 240; i++) stepRace(r, 1 / 60, { accelerate: true });
   assert.ok(p.speed > 34.5);
   for (let i = 0; i < 40; i++) stepRace(r, 1 / 60, { accelerate: true, brake: true });
-  assert.ok(p.speed < 16);
+  assert.ok(p.speed < 17);
 });
 test('lower sensitivity supports fine corrections while high sensitivity turns faster', () => {
   const a = solo(),

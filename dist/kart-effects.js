@@ -151,6 +151,64 @@ export function makeEffects(scene, track, karts, reduced) {
       scene.add(mesh);
       missiles.push({ mesh, start: p.clone(), target: e.target, life: 1.05, total: 1.05 });
     }
+    if (e.type === 'noconf-fired') {
+      // A judge's gavel: it climbs high and drops on the leader.
+      const mesh = new T.Group(),
+        head = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 1.3, 14), material('#6b3d24')),
+        band = new T.Mesh(new T.CylinderGeometry(0.44, 0.44, 0.18, 14), material('#e2b84a')),
+        handle = new T.Mesh(new T.CylinderGeometry(0.1, 0.12, 1.7, 8), material('#8a5634'));
+      head.rotation.z = Math.PI / 2;
+      band.rotation.z = Math.PI / 2;
+      handle.position.y = -0.9;
+      mesh.add(head, band, handle);
+      mesh.scale.setScalar(1.4);
+      scene.add(mesh);
+      missiles.push({
+        mesh,
+        start: p.clone(),
+        target: e.target,
+        life: 1.9,
+        total: 1.9,
+        arc: 14,
+        trail: '#f2d67a'
+      });
+      say(p, 'אי־אמון!', '#ffe08a');
+    }
+    if (e.type === 'leaked') {
+      burst(p, '#f4f1e6', 26);
+      say(p, e.breaking ? 'מבזק!' : 'הדלפה!', '#f6f1df');
+    }
+    if (e.type === 'spun') {
+      ring(p, '#c79bff');
+      say(p, 'ההגה הפוך!', '#dcc2ff');
+    }
+    if (e.type === 'budget') {
+      burst(p, '#f6d66b', 24);
+      say(p, '+' + e.amount + ' פתקים', '#ffe48f');
+    }
+    if (e.type === 'drop') ring(p, '#f0b27a');
+    if (e.type === 'cleared') {
+      burst(p, '#6c9bff', 16);
+      ring(p, '#ff5a5a');
+    }
+    if (e.type === 'warp') {
+      burst(p, '#ffe9a8', 34);
+      ring(p, '#ffe9a8');
+    }
+    if (e.type === 'ability') {
+      const color = {
+        immunity: '#ffd65c',
+        breaking: '#ff5f6d',
+        protest: '#ff8a5c',
+        resign: '#ffe9a8',
+        funds: '#f4d36b',
+        siren: '#5d8cff'
+      }[e.ability];
+      burst(p, color, 42);
+      ring(p, color);
+      ring(p.clone().setY(p.y + 0.6), '#ffffff');
+      if (r.player && !reduced) shake = Math.max(shake, 0.2);
+    }
     if (e.type === 'hit') {
       burst(p, '#ff895f', 30);
       ring(p, '#ffb87c');
@@ -241,9 +299,10 @@ export function makeEffects(scene, track, karts, reduced) {
       if (target) {
         const u = 1 - Math.max(0, m.life) / m.total;
         m.mesh.position.copy(m.start).lerp(effectPoint(target), u);
-        m.mesh.position.y += Math.sin(u * Math.PI) * 5;
-        m.mesh.rotation.set(clock * 9, clock * 6, clock * 3);
-        if (!reduced && Math.floor(clock * 60) % 3 === 0) burst(m.mesh.position, '#f3a1ce', 1);
+        m.mesh.position.y += Math.sin(u * Math.PI) * (m.arc ?? 5);
+        if (m.arc) m.mesh.rotation.set(0, clock * 4, u > 0.75 ? (u - 0.75) * 10 : 0);
+        else m.mesh.rotation.set(clock * 9, clock * 6, clock * 3);
+        if (!reduced && Math.floor(clock * 60) % 3 === 0) burst(m.mesh.position, m.trail ?? '#f3a1ce', 1);
       }
       if (m.life <= 0) {
         m.mesh.removeFromParent();

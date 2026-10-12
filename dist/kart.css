@@ -3398,3 +3398,91 @@ footer button {
     border-left: 1px solid #f5f9e966;
   }
 }
+
+/* Leader ability: the portrait is the button; a ring fills as the ability charges. */
+button.driver-bubble {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  --charge: 0;
+}
+button.driver-bubble img {
+  outline: 4px solid transparent;
+  background:
+    linear-gradient(#eef8d5, #eef8d5) padding-box,
+    conic-gradient(#ffd65c calc(var(--charge) * 1turn), #2d455055 0) border-box;
+  border: 5px solid transparent;
+}
+button.driver-bubble.ready img {
+  animation: ability-ready 0.9s ease-in-out infinite;
+}
+.ability-name {
+  display: none;
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #2d2a12;
+  background: #ffd65c;
+  border-radius: 20px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+button.driver-bubble.ready .ability-name {
+  display: block;
+}
+@keyframes ability-ready {
+  50% {
+    box-shadow:
+      0 0 0 5px #ffd65c66,
+      0 0 26px #ffd65c;
+  }
+}
+.arena.starred .vignette {
+  box-shadow: inset 0 0 90px #ffd65c88;
+}
+.arena.confused .vignette {
+  box-shadow: inset 0 0 90px #b48cff99;
+}
+
+/* A leak plasters newsprint over the windscreen for a few seconds. */
+.leak-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s;
+  z-index: 4;
+}
+.leak-overlay p {
+  position: absolute;
+  margin: 0;
+  padding: 18px 26px;
+  background: #f4f0e2;
+  color: #1c1c1c;
+  font:
+    900 clamp(18px, 3vw, 34px) / 1.1 Heebo,
+    Arial,
+    sans-serif;
+  box-shadow: 0 10px 30px #0006;
+  border-top: 6px solid #1c1c1c;
+}
+.leak-overlay p:nth-child(1) {
+  top: 18%;
+  right: 8%;
+  transform: rotate(-7deg);
+}
+.leak-overlay p:nth-child(2) {
+  top: 42%;
+  left: 12%;
+  transform: rotate(5deg);
+}
+.leak-overlay p:nth-child(3) {
+  bottom: 22%;
+  right: 22%;
+  transform: rotate(-3deg);
+}
+.arena.leaked .leak-overlay {
+  opacity: 1;
+}

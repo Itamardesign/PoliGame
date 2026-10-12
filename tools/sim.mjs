@@ -1,6 +1,15 @@
 // Headless balance check: full races on every course with the real track geometry, encounters and
 // pickups. The "player" is driven either by a skilled bot (the same AI brain) or a basic bot.
-import { makeRace, stepRace, ranking, startRace, useItem, PACE, CATCH_UP } from '../dist/race-model.js';
+import {
+  makeRace,
+  stepRace,
+  ranking,
+  startRace,
+  useItem,
+  useAbility,
+  PACE,
+  CATCH_UP
+} from '../dist/race-model.js';
 if (process.env.PACE) Object.assign(PACE, JSON.parse(process.env.PACE));
 if (process.env.CATCH) Object.assign(CATCH_UP, JSON.parse(process.env.CATCH));
 import { makeBrain, aiInput } from '../dist/race-ai.js';
@@ -44,6 +53,7 @@ for (const level of LEVELS) {
         p.brain = null;
         if (mode === 'basic') input = { steer: input.steer, accelerate: true };
         if (input.useItem) useItem(race, p);
+        if (input.useAbility) useAbility(race, p);
       }
       stepRace(race, 1 / 60, input, curve);
       stepEncounters(race, before, wasRoute);
@@ -54,6 +64,7 @@ for (const level of LEVELS) {
           events[e.type] = (events[e.type] ?? 0) + 1;
           if (e.cause) events['hit-' + e.cause] = (events['hit-' + e.cause] ?? 0) + 1;
           if (e.player) events['me-' + e.type] = (events['me-' + e.type] ?? 0) + 1;
+          if (e.cause && e.player) events['mehit-' + e.cause] = (events['mehit-' + e.cause] ?? 0) + 1;
         }
     }
     const order = ranking(race);
@@ -65,6 +76,11 @@ for (const level of LEVELS) {
   const avg = a => (a.reduce((s, x) => s + x, 0) / a.length).toFixed(2);
   const per = k => ((events[k] ?? 0) / runs).toFixed(1);
   console.log(
-    `${level.id.padEnd(9)} ${mode}: places ${places.join(',')} avg ${avg(places)} | spread ${avg(gaps)}s | per race: hits ${per('hit')} rams ${per('ram')} polls ${per('poll-fired')} drift-boosts ${per('drift-boost')} shortcuts ${per('shortcut-enter')} near-miss ${per('near-miss')} jackpots ${per('jackpot')} | barrier ${per('hit-barrier')} ball ${per('hit-ball')} ram ${per('hit-ram')} poll ${per('hit-poll')} | me: hits ${per('me-hit')} drift ${per('me-drift-boost')} items ${per('me-item-use')}`
+    `${level.id.padEnd(9)} ${mode}: places ${places.join(',')} avg ${avg(places)} | spread ${avg(gaps)}s | per race: hits ${per('hit')} rams ${per('ram')} polls ${per('poll-fired')} drift-boosts ${per('drift-boost')} shortcuts ${per('shortcut-enter')} near-miss ${per('near-miss')} jackpots ${per('jackpot')} | barrier ${per('hit-barrier')} ball ${per('hit-ball')} ram ${per('hit-ram')} poll ${per('hit-poll')} abilities ${per('ability')} leaks ${per('leaked')} drops ${per('drop')} noconf ${per('noconf-fired')} | me: hits ${per('me-hit')} (${Object.keys(
+      events
+    )
+      .filter(k => k.startsWith('mehit-'))
+      .map(k => k.slice(6) + ' ' + per(k))
+      .join(', ')}) drift ${per('me-drift-boost')} items ${per('me-item-use')}`
   );
 }

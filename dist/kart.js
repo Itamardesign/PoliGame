@@ -17,6 +17,7 @@ import {
   coastRace
 } from './race-model.js';
 import { layoutPickups } from './race-course.js';
+import { ITEMS, ABILITIES, useAbility } from './race-items.js';
 import {
   makeKart,
   loadLogos,
@@ -343,6 +344,8 @@ function start() {
   clearControls();
   fx.reset();
   trails.reset();
+  for (const mesh of dropMeshes.values()) mesh.removeFromParent();
+  dropMeshes.clear();
   seenEvent = 0;
   launchPressed = 99;
   race = makeRace(selected, level.difficulty, Date.now(), track.length, track.shortcuts, level.id, { bend });
@@ -401,12 +404,15 @@ function resume() {
   $('pauseScreen').classList.add('hidden');
   canvas.focus({ preventScroll: true });
 }
-const itemNames = {
-  boost: ['↯', 'טורבו הבטחות'],
-  shield: ['◉', 'חסינות פרלמנטרית'],
-  poll: ['↝', 'סקר מפתיע'],
-  magnet: ['🧲', 'מגנט מנדטים']
-};
+const itemNames = Object.fromEntries(Object.entries(ITEMS).map(([k, v]) => [k, [v.glyph, v.name]]));
+function activateAbility() {
+  if (state !== 'running') return;
+  const used = useAbility(race, race.racers[0]);
+  if (used) {
+    pulse([20, 30, 40]);
+    updateHUD();
+  }
+}
 function activateItem() {
   if (state !== 'running') return;
   const item = useItem(race, race.racers[0]);
@@ -427,6 +433,10 @@ function consumeEvents() {
       if (e.type === 'hit') trails.puff(kart.position.clone().setY(kart.position.y + 0.8), '#f1d9c2', 16, 5);
     }
     const me = e.id === selected;
+    if (e.type === 'noconf-fired' && e.target === selected) {
+      feedback('הצבעת אי־אמון נגדכם! חסינות לא תעזור', 'danger');
+      tone(180, 0.35, 'square');
+    }
     if (e.type === 'poll-fired' && e.target === selected) {
       feedback('סקר בדרך אליכם! הפעילו חסינות', 'danger');
       tone(230, 0.2, 'square');
@@ -443,7 +453,14 @@ function consumeEvents() {
       trick: 'סטייל! מתכוננים לנחיתה',
       'shield-break': 'החסינות ספגה את הפגיעה',
       'no-target': 'אין יריב בטווח הסקר',
-      'launch-boost': 'זינוק מושלם!'
+      'launch-boost': 'זינוק מושלם!',
+      leaked: 'הדלפה! לא רואים כלום…',
+      spun: 'ספין דוקטור! ההגה הפוך',
+      cleared: 'פינו לכם את הדרך — בכוח',
+      'drop-hit': 'נתקעתם בחסימה',
+      'ability-ready': ABILITIES[selected].name + ' מוכנה · E או הקשה על הפרצוף',
+      ability: ABILITIES[selected].name + '!',
+      warp: 'התפטרתם… וחזרתם קדימה!'
     };
     if (messages[e.type]) {
       feedback(messages[e.type]);
@@ -460,8 +477,17 @@ function consumeEvents() {
       if (compactTouchLayout()) navigator.vibrate?.(45);
       tone(570, 0.12);
     }
+    if (e.type === 'budget') {
+      feedback('העברה תקציבית: +' + e.amount + ' פתקים');
+      tone(980, 0.16);
+    }
     if (e.type === 'item-use') {
       const msg = {
+        leak: 'ההדלפה פורסמה!',
+        spin: 'הספין יצא לדרך',
+        filibuster: 'פיליבסטר! חסמתם את הנתיב',
+        noconf: 'הצבעת אי־אמון יצאה לדרך',
+        budget: 'העברה תקציבית',
         boost: 'טורבו הבטחות!',
         shield: 'חסינות פעילה · 6 שניות',
         magnet: 'מגנט מנדטים · 7 שניות',
@@ -494,8 +520,8 @@ function updateKarts(dt) {
   for (const r of race.racers) {
     const kart = karts[r.id];
     animateKart(kart, r, racerFrame(track, r), dt, ctx);
-    kart.userData.shield.visible = r.shield > 0 || r.magnet > 0;
-    kart.userData.shield.material.color.set(r.shield > 0 ? '#80e8fa' : '#ee8ce0');
+    kart.userData.shield.visible = r.shield > 0 || r.magnet > 0 || r.star > 0;
+    kart.userData.shield.material.color.set(r.star > 0 ? '#ffd65c' : r.shield > 0 ? '#80e8fa' : '#ee8ce0');
     kart.userData.shield.material.opacity = 0.12 + Math.sin(elapsed * 6) * 0.035;
     for (const f of kart.userData.fx)
       f.mesh.visible = reduced || Math.floor(elapsed * f.rate + (f.phase || 0)) % 2 === 0;
@@ -636,15 +662,31 @@ function updateHUD() {
   arena.classList.toggle('hit-flash', p.stun > 0 && !reduced);
   arena.classList.toggle('shielded', p.shield > 0);
   arena.classList.toggle('magnetized', p.magnet > 0);
-  $('effectStatus').textContent = p.routeId
-    ? '✦ דרך סודית'
-    : p.magnet > 0
-      ? '🧲 ' + Math.ceil(p.magnet) + 's'
-      : p.shield > 0
-        ? '◉ ' + Math.ceil(p.shield) + 's'
-        : p.air > 0
-          ? '↑ באוויר'
-          : '';
+  arena.classList.toggle('leaked', p.blind > 0 && !reduced);
+  arena.classList.toggle('confused', p.confused > 0);
+  arena.classList.toggle('starred', p.star > 0);
+  const abilityButton = $('ability');
+  abilityButton.style.setProperty('--charge', p.ability.toFixed(3));
+  abilityButton.classList.toggle('ready', p.ability >= 1);
+  $('abilityName').textContent = ABILITIES[selected].name + (compactTouchLayout() ? '' : ' · E');
+  abilityButton.setAttribute(
+    'aria-label',
+    ABILITIES[selected].name + (p.ability >= 1 ? ' — מוכנה' : ' — ' + Math.round(p.ability * 100) + '%')
+  );
+  $('effectStatus').textContent =
+    p.confused > 0
+      ? '↻ ההגה הפוך'
+      : p.star > 0
+        ? '✦ ' + Math.ceil(p.star) + 's'
+        : p.routeId
+          ? '✦ דרך סודית'
+          : p.magnet > 0
+            ? '🧲 ' + Math.ceil(p.magnet) + 's'
+            : p.shield > 0
+              ? '◉ ' + Math.ceil(p.shield) + 's'
+              : p.air > 0
+                ? '↑ באוויר'
+                : '';
   if (p.routeId) $('sectorName').textContent = track.shortcuts.find(r => r.id === p.routeId).name;
   $('speed').textContent = Math.round(p.speed * 4);
   $('speedFill').style.width = (p.speed / 47) * 100 + '%';
@@ -707,6 +749,70 @@ function updateHUD() {
 // The race owns pickups; meshes only mirror whether each one is currently collectable.
 function syncPickups() {
   race.pickups.forEach((p, i) => (pickups[i].mesh.visible = p.hiddenUntil <= race.time));
+  syncDrops();
+}
+// Filibuster and protest roadblocks, kept in step with race.drops.
+const dropMeshes = new Map();
+function makeDrop(kind) {
+  const g = new T.Group();
+  if (kind === 'filibuster') {
+    // A lectern buried in paper: the speech that never ends.
+    box(g, 1.1, 1.15, 0.7, '#6d4a33', 0, 0.58, 0);
+    box(g, 1.3, 0.12, 0.85, '#8a6143', 0, 1.2, 0);
+    for (let i = 0; i < 7; i++) {
+      const sheet = box(
+        g,
+        0.62,
+        0.04,
+        0.82,
+        '#f6f1e2',
+        ((i % 3) - 1) * 0.45,
+        0.05 + i * 0.07,
+        (i % 2) * 0.3 - 0.15
+      );
+      sheet.rotation.y = i * 0.7;
+    }
+    const sign = label('פיליבסטר', 1.6, 0.42, '#f6f1e2', '#3b2a1e', 90);
+    sign.position.set(0, 1.62, 0);
+    g.add(sign);
+  } else {
+    // Protest: placards on sticks and a cardboard barrier.
+    box(g, 2.2, 0.55, 0.16, '#d9c39a', 0, 0.3, 0);
+    for (let i = 0; i < 3; i++) {
+      box(g, 0.06, 1.7, 0.06, '#8b6b4a', (i - 1) * 0.75, 0.9, 0);
+      const sign = label(
+        ['די!', 'לא נוותר', 'ביחד'][i],
+        0.8,
+        0.55,
+        ['#ffffff', '#ffe08a', '#ffb3a8'][i],
+        '#202020',
+        110
+      );
+      sign.position.set((i - 1) * 0.75, 1.8, 0.05);
+      sign.rotation.z = (i - 1) * 0.12;
+      g.add(sign);
+    }
+  }
+  g.traverse(m => (m.castShadow = true));
+  return g;
+}
+function syncDrops() {
+  const live = new Set();
+  for (const d of race.drops) {
+    live.add(d.id);
+    if (dropMeshes.has(d.id)) continue;
+    const mesh = makeDrop(d.kind),
+      at = track.at(d.s, d.x);
+    mesh.position.copy(at.p);
+    mesh.rotation.y = Math.atan2(at.t.x, at.t.z) + Math.PI;
+    scene.add(mesh);
+    dropMeshes.set(d.id, mesh);
+  }
+  for (const [id, mesh] of dropMeshes)
+    if (!live.has(id)) {
+      mesh.removeFromParent();
+      dropMeshes.delete(id);
+    }
 }
 function finish() {
   state = 'results';
@@ -860,6 +966,7 @@ $('pause').onclick = pause;
 $('resume').onclick = resume;
 $('quit').onclick = goHome;
 $('item').onclick = activateItem;
+$('ability').onclick = activateAbility;
 canvas.addEventListener('pointerup', e => {
   if (e.pointerType !== 'mouse' && compactTouchLayout() && state === 'running' && race?.racers[0].item)
     activateItem();
@@ -879,7 +986,7 @@ $('fullscreen').onclick = async () => {
     toast('מסך מלא אינו זמין בדפדפן הזה');
   }
 };
-const commandCodes = new Set(['Space', 'Escape', 'KeyP', 'KeyC']);
+const commandCodes = new Set(['Space', 'Escape', 'KeyP', 'KeyC', 'KeyE']);
 addEventListener('keydown', e => {
   if ($('info').open || e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
   if (
@@ -895,6 +1002,7 @@ addEventListener('keydown', e => {
   if (e.repeat) return;
   if (state === 'countdown' && (e.code === 'KeyW' || e.code === 'ArrowUp')) launchPressed = count;
   if (e.code === 'Space') activateItem();
+  if (e.code === 'KeyE') activateAbility();
   if (e.code === 'KeyC') toggleCamera();
   if (e.code === 'Escape' || e.code === 'KeyP') {
     if (state === 'paused') resume();

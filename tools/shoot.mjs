@@ -57,6 +57,7 @@ while (true) {
     held = key;
   }
   if (Math.random() < 0.05) await page.keyboard.press('Space');
+  if (Math.random() < 0.05) await page.keyboard.press('KeyE');
   // Drift in bursts: hold Shift for ~1.5 s whenever steering, then release for the boost.
   const wantDrift = !!key && st.time % 5 < 1.6;
   if (wantDrift !== shiftHeld) {

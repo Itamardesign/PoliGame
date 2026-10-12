@@ -176,10 +176,13 @@ function chooseLine(race, r, dt) {
       x += (o.x - x) * 0.45 * P.block;
   }
 
-  // Occasional lapses keep the pack from looking robotic.
+  // Occasional lapses keep the pack from looking robotic; a leaked headline over the windscreen
+  // makes one certain.
   if (brain.wobble > 0) {
     brain.wobble -= dt;
     x += Math.sin(race.time * 5 + r.id) * 3.2;
+  } else if (r.blind > 0) {
+    x += Math.sin(race.time * 3.3 + r.id) * 1.6;
   } else if (race.random() < dt * 0.07 * (1.2 - sharp) * (1 + P.risk))
     brain.wobble = 0.5 + race.random() * 0.7;
   x = clamp(x, -EDGE, EDGE);
@@ -187,12 +190,17 @@ function chooseLine(race, r, dt) {
   // Last word goes to safety: among a few candidate lines, take the one closest to the plan that
   // clears every noticed barrier and spin ball arriving within the next ~1.4 seconds.
   if (brain.wobble <= 0 && !r.routeId) {
-    const reach = 6 + Math.max(r.speed, 20) * 1.4,
+    // Blinded drivers still react, just late.
+    const reach = (6 + Math.max(r.speed, 20) * 1.4) * (r.blind > 0 ? 0.55 : 1),
       hazards = [];
     for (const p of race.pickups) {
       if (p.type !== 'barrier') continue;
       const d = (((p.s - r.s) % race.length) + race.length) % race.length;
       if (d > 1.5 && d < reach && notices(race, r, 'b' + p.s + lap)) hazards.push({ x: p.x, clear: 3.1, d });
+    }
+    for (const drop of race.drops ?? []) {
+      const d = drop.s - r.s;
+      if (d > 1.5 && d < reach && notices(race, r, 'd' + drop.id)) hazards.push({ x: drop.x, clear: 3, d });
     }
     for (const e of encountersFor(race.levelId)) {
       if (e.kind !== 'ball') continue;
@@ -256,8 +264,46 @@ function decideItem(race, r, dt) {
       const target = ahead.reduce((a, b) => (b.s < a.s ? b : a));
       return target.player || rank === 2 || P.patience < 0.5 || impatience;
     }
+    case 'noconf':
+      return rank > 1;
+    case 'leak':
+      return rank > 1 || impatience;
+    case 'spin': {
+      const target = race.racers.some(o => o !== r && o.finish === null && o.s > r.s && o.s - r.s < 80);
+      return target && (P.patience < 0.6 || rank <= 3 || impatience);
+    }
+    case 'budget':
+      return race.racers.some(o => o !== r && o.s > r.s && o.s - r.s < 55 && o.coins >= 3) || impatience;
+    case 'filibuster': {
+      // Drop it on someone's line: wait for a rival close behind.
+      const chaser = race.racers.some(o => o !== r && o.finish === null && r.s - o.s > 4 && r.s - o.s < 30);
+      return chaser || brain.itemHeld > 8 + P.patience * 10;
+    }
     default:
       return impatience || race.random() < 0.01 + P.aggression * 0.01;
+  }
+}
+
+function decideAbility(race, r) {
+  if (r.ability < 1 || r.stun > 0 || r.air > 0) return false;
+  const rank = rankOf(race, r),
+    near = (lo, hi) =>
+      race.racers.some(o => o !== r && o.finish === null && o.s - r.s > lo && o.s - r.s < hi);
+  switch (r.id) {
+    case 0:
+      return rank > 1 || near(-12, 0);
+    case 1:
+      return near(10, 200);
+    case 2:
+      return near(-25, -4);
+    case 3:
+      return Math.abs(bendAhead(race, r, 0, 30, 10)) < 0.012;
+    case 4:
+      return r.coins < 6;
+    case 5:
+      return near(2, 35);
+    default:
+      return true;
   }
 }
 
@@ -309,6 +355,7 @@ export function aiInput(race, r, dt, curve) {
     accelerate: true,
     brake: false,
     useItem: decideItem(race, r, dt),
+    useAbility: decideAbility(race, r),
     aggression: P.aggression
   };
 }

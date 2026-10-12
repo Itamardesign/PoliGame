@@ -1,5 +1,15 @@
 import { makeBrain, aiInput } from './race-ai.js';
 import { layoutPickups, PICKUP_RADIUS, RESPAWN } from './race-course.js';
+import {
+  grantItem,
+  useItem,
+  useAbility,
+  stepProjectiles,
+  stepDrops,
+  chargeFromEvent,
+  STATS
+} from './race-items.js';
+export { grantItem, useItem, useAbility, STATS };
 export const LAPS = 3;
 export const ROAD = Object.freeze({ halfWidth: 10, driveEdge: 9.7, maxOffset: 14.5 });
 export const SECTORS = [
@@ -111,9 +121,22 @@ export function rng(seed) {
 
 // Rival pace per difficulty, added to the shared base speed. Catch-up keeps the pack in reach:
 // rivals far behind get a little extra, rivals far ahead ease off.
-export const PACE = { normal: -1.2, hard: 1.4, insane: 2.6 };
+export const PACE = { normal: -1.6, hard: 0.2, insane: 1.7 };
 export const CATCH_UP = { normal: 1, hard: 0.8, insane: 0.6 };
 const BASE_SPEED = 32;
+const TIMERS = [
+  'boost',
+  'shield',
+  'stun',
+  'hitCooldown',
+  'magnet',
+  'hop',
+  'slipCooldown',
+  'blind',
+  'confused',
+  'star',
+  'abilityActive'
+];
 
 export function makeRace(
   party = 0,
@@ -139,6 +162,8 @@ export function makeRace(
     events: [],
     eventSeq: 0,
     projectiles: [],
+    drops: [],
+    dropSeq: 0,
     done: false,
     used: 0,
     drifts: 0,
@@ -175,6 +200,12 @@ export function makeRace(
       finish: null,
       projected: null,
       hitCooldown: 0,
+      blind: 0,
+      confused: 0,
+      star: 0,
+      ability: 0,
+      abilityActive: 0,
+      stats: STATS[id],
       skill: 0.985 + random() * 0.03,
       brain: i === 0 ? null : makeBrain(id, random)
     }))
@@ -192,13 +223,6 @@ export function ranking(race) {
           : b.s - a.s
   );
 }
-export function grantItem(race, racer) {
-  if (racer.item) return;
-  const rank = ranking(race).indexOf(racer);
-  const r = race.random();
-  racer.item = r < 0.25 ? 'shield' : r < 0.52 || rank >= 4 ? 'boost' : r < 0.79 ? 'poll' : 'magnet';
-  emitRace(race, 'item-get', racer, { item: racer.item });
-}
 export function emitRace(race, type, racer, data = {}) {
   const event = {
     seq: ++race.eventSeq,
@@ -211,6 +235,7 @@ export function emitRace(race, type, racer, data = {}) {
   };
   race.events.push(event);
   if (race.events.length > 120) race.events.shift();
+  chargeFromEvent(race, racer, type, data);
   return event;
 }
 export function launch(race, racer) {
@@ -220,28 +245,8 @@ export function launch(race, racer) {
   race.jumps += racer.player ? 1 : 0;
   emitRace(race, 'jump', racer);
 }
-export function useItem(race, racer) {
-  if (!racer.item || race.done) return null;
-  const item = racer.item;
-  racer.item = null;
-  if (racer.player) race.used++;
-  if (item === 'boost') racer.boost = Math.max(racer.boost, 2.6);
-  if (item === 'shield') racer.shield = 6;
-  if (item === 'magnet') racer.magnet = 7;
-  emitRace(race, 'item-use', racer, { item });
-  if (item === 'poll') {
-    const target = ranking(race)
-      .filter(r => r !== racer && r.s > racer.s && r.s - racer.s < 160 && r.finish === null)
-      .at(-1);
-    if (target) {
-      race.projectiles.push({ from: racer.id, to: target.id, remaining: 1.05 });
-      emitRace(race, 'poll-fired', racer, { target: target.id });
-    } else emitRace(race, 'no-target', racer);
-  }
-  return item;
-}
 export function hitRacer(racer, race = null, cause = 'hazard') {
-  if (racer.hitCooldown > 0) return false;
+  if (racer.hitCooldown > 0 || racer.star > 0) return false;
   racer.hitCooldown = 1.5;
   if (racer.shield > 0) {
     racer.shield = 0;
@@ -309,25 +314,6 @@ export function stepPickups(race, r, before) {
   }
 }
 
-function hitByProjectiles(race, dt) {
-  for (const p of race.projectiles) {
-    p.remaining -= dt;
-    if (p.remaining > 0) continue;
-    const target = race.racers.find(r => r.id === p.to);
-    if (!target || target.finish !== null) continue;
-    if (target.shield > 0) {
-      target.shield = 0;
-      emitRace(race, 'shield-break', target);
-    } else {
-      target.stun = 1.8;
-      target.charge = 0;
-      target.drifting = false;
-      emitRace(race, 'hit', target, { from: p.from, cause: 'poll' });
-    }
-  }
-  race.projectiles = race.projectiles.filter(p => p.remaining > 0);
-}
-
 function routeBendOf(race, r) {
   const route = r.routeId && race.routes.find(p => p.id === r.routeId);
   return route?.bend ? route.bend(r.routeDistance) : race.bend(r.s);
@@ -358,7 +344,7 @@ export function stepRace(race, dt, input = {}, curve = 0) {
   if (race.done) return;
   dt = clamp(dt, 0, 0.05);
   race.time += dt;
-  hitByProjectiles(race, dt);
+  stepProjectiles(race, dt);
   for (const p of race.pickups) if (p.hiddenUntil > 0 && p.hiddenUntil <= race.time) p.hiddenUntil = -1;
   const lead = race.racers.find(r => r.player) ?? race.racers[0];
   for (const r of race.racers) {
@@ -370,11 +356,11 @@ export function stepRace(race, dt, input = {}, curve = 0) {
       r.drifting = false;
       continue;
     }
-    for (const k of ['boost', 'shield', 'stun', 'hitCooldown', 'magnet', 'hop', 'slipCooldown'])
-      r[k] = Math.max(0, r[k] - dt);
+    for (const k of TIMERS) r[k] = Math.max(0, r[k] - dt);
     const bendHere = r.player ? curve : routeBendOf(race, r);
     const control = r.player ? input : aiInput(race, r, dt, bendHere);
     if (!r.player && control.useItem) useItem(race, r);
+    if (!r.player && control.useAbility) useAbility(race, r);
     const wasDrifting = r.drifting,
       before = r.s,
       wasAir = r.air > 0;
@@ -390,7 +376,7 @@ export function stepRace(race, dt, input = {}, curve = 0) {
         emitRace(race, 'land', r, { trick: r.trick });
       }
     }
-    const requested = clamp(control.steer || 0, -1, 1),
+    const requested = clamp(control.steer || 0, -1, 1) * (r.confused > 0 ? -1 : 1),
       sensitivity = r.player ? clamp(control.sensitivity ?? 1, 0.65, 1.35) : 1;
     // Quick turn-in, smooth velocity, and stronger damping on release. No key-repeat dependency.
     r.steer += (requested - r.steer) * -Math.expm1(-dt * (requested === 0 ? 22 : 13));
@@ -401,7 +387,8 @@ export function stepRace(race, dt, input = {}, curve = 0) {
       !wasAir &&
       r.stun <= 0 &&
       Math.abs(r.x) < (r.routeId ? 2 : ROAD.driveEdge);
-    const grip = r.drifting ? 8.8 : 11.4;
+    const handling = r.stats?.grip ?? 0,
+      grip = (r.drifting ? 8.8 : 11.4) + handling * 0.8;
     const desired =
       r.steer * grip * sensitivity * (0.72 + Math.min(r.speed, 45) / 110) +
       bendHere * r.speed * (r.drifting ? 1.8 : 3.5);
@@ -427,7 +414,8 @@ export function stepRace(race, dt, input = {}, curve = 0) {
       r.charge = 0;
     }
 
-    let target = BASE_SPEED + Math.min(r.coins, 10) * 0.2;
+    const stats = r.stats ?? STATS[0];
+    let target = BASE_SPEED + stats.top + Math.min(r.coins, 10) * stats.ballot;
     if (control.accelerate && !control.brake) target += 3;
     if (!r.player) {
       target += (PACE[race.difficulty] ?? PACE.normal) + (r.skill - 1) * 30;
@@ -439,10 +427,13 @@ export function stepRace(race, dt, input = {}, curve = 0) {
       }
     }
     if (r.boost > 0) target += 13;
+    if (r.star > 0) target += 6;
     if (r.stun > 0) target *= 0.4;
-    if (Math.abs(r.x) > (r.routeId ? 2.1 : ROAD.driveEdge)) target *= r.routeId ? 0.65 : 0.48;
+    if (Math.abs(r.x) > (r.routeId ? 2.1 : ROAD.driveEdge) && r.star <= 0)
+      target *= r.routeId ? 0.65 : 0.48 + stats.offroad;
     if (control.brake) target *= 0.48;
-    r.speed += (target - r.speed) * -Math.expm1(-dt * (control.brake ? 6 : 2.3));
+    const pickup = target > r.speed ? 2.3 + stats.accel : 2.3;
+    r.speed += (target - r.speed) * -Math.expm1(-dt * (control.brake ? 6 : pickup));
     const distance = r.speed * dt;
     if (r.routeId) {
       const route = race.routes.find(p => p.id === r.routeId);
@@ -507,6 +498,7 @@ export function stepRace(race, dt, input = {}, curve = 0) {
       emitRace(race, 'finish', r, { place: race.racers.filter(o => o.finish !== null).length });
     }
   }
+  stepDrops(race);
   const player = race.racers.find(r => r.player) ?? race.racers[0];
   if (player.finish !== null) {
     player.s = race.length * LAPS;

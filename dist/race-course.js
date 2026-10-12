@@ -43,7 +43,7 @@ export function layoutPickups(length, bend = () => 0) {
   for (let s = 35; s < length; s += 67) for (const x of [-6.5, 0, 6.5]) add('box', s, x);
   for (let s = 19; s < length; s += 28)
     for (let j = 0; j < 3; j++) add('coin', s + j * 3.5, Math.sin(s * 0.06) * 6.2);
-  for (let s = 68; s < length; s += 57) add('barrier', s, Math.sin(s * 0.2) * 6.2);
+  for (let s = 68; s < length; s += 84) add('barrier', s, Math.sin(s * 0.2) * 6.2);
   for (let s = 95; s < length; s += 150) add('boost', s, Math.sign(bend(s) || 1) * -7.3);
   for (const u of [0.33, 0.73]) add('ramp', length * u, 0);
   return list;

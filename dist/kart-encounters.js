@@ -34,6 +34,10 @@ function crossEncounters(race, p, before) {
     }
   }
 }
+// A boosting kart closing in hard spins the one it hits, if it meant to: the player always does,
+// rivals only when they have lined up a ram. Accidental contact is just a bump.
+const rams = (a, b) =>
+  a.boost > 0 && b.boost <= 0 && a.speed - b.speed > 5 && (a.player || !a.brain || a.brain.ram);
 export function bumpRivals(race) {
   const racers = race.racers,
     contacts = (race.bumpTimes ??= new Map());
@@ -47,13 +51,21 @@ export function bumpRivals(race) {
       if (Math.abs(a.s - b.s) >= 2.3 || Math.abs(dx) >= 1.85) continue;
       const side = dx !== 0 ? Math.sign(dx) : a.id < b.id ? -1 : 1;
       // A ram needs a boosting kart closing in hard on one that is not boosting.
+      // Super immunity flattens anything it touches.
       const attacker =
-        a.boost > 0 && b.boost <= 0 && a.speed - b.speed > 5
+        a.star > 0 && !(b.star > 0)
           ? a
-          : b.boost > 0 && a.boost <= 0 && b.speed - a.speed > 5
+          : b.star > 0 && !(a.star > 0)
             ? b
-            : null;
-      const aShare = attacker === a ? 0.2 : attacker === b ? 0.8 : 0.5;
+            : rams(a, b)
+              ? a
+              : rams(b, a)
+                ? b
+                : null;
+      // Heavier karts give way less: share of the separation each kart takes.
+      const wa = a.stats?.weight ?? 1,
+        wb = b.stats?.weight ?? 1;
+      const aShare = attacker === a ? 0.2 : attacker === b ? 0.8 : wb / (wa + wb);
       const separation = Math.min(1.85 - Math.abs(dx), attacker ? 1.25 : 0.9);
       a.x = clamp(a.x + side * separation * aShare, -14.5, 14.5);
       b.x = clamp(b.x - side * separation * (1 - aShare), -14.5, 14.5);
