@@ -512,7 +512,8 @@ export function stepRace(race, dt, input = {}, curve = 0) {
     }
     r.lastDrift = !!control.drift;
     if (r.s >= race.length * LAPS) {
-      r.finish = race.time;
+      // Interpolate the moment the line was crossed inside this step.
+      r.finish = race.time - (r.s - race.length * LAPS) / Math.max(r.speed, 1);
       r.projected = r.finish;
       r.s = race.length * LAPS;
       emitRace(race, 'finish', r, { place: race.racers.filter(o => o.finish !== null).length });

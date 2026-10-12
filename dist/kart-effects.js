@@ -100,7 +100,8 @@ export function makeEffects(scene, track, karts, reduced) {
     if (!r) return;
     const p = effectPoint(r);
     // Rivals get particles but only speak up for the big moments, so the screen stays readable.
-    const say = r.player || ['hit', 'ram', 'shield-break'].includes(e.type) ? word : () => {};
+    // Floating words are gone: the HUD callouts and the ticker carry the commentary now.
+    const say = () => {};
     if (e.type === 'jackpot') {
       burst(p, '#ffe276', 36);
       ring(p, '#ffe276');

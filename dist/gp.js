@@ -21,7 +21,7 @@ export const DEMANDS = {
   item: { name: 'חלוקת תיקים', cost: 'בלי הצבעות אי־אמון בקופסאות' }
 };
 // What each party asks for when invited.
-const ASKS = ['cap', 'launch', 'drift', 'grid', 'veto', 'item'];
+export const ASKS = ['cap', 'launch', 'drift', 'grid', 'veto', 'item'];
 
 export function newGrandPrix(player) {
   return {

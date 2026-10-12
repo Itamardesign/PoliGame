@@ -1,23 +1,17 @@
 import * as T from './vendor/three.module.min.js';
 import {
   PARTIES,
-  LAPS,
   ROAD,
-  SECTORS,
-  sectorAt,
   makeRace,
   stepRace,
   ranking,
-  grantItem,
   useItem,
-  hitRacer,
   clamp,
-  emitRace,
   startRace,
   coastRace
 } from './race-model.js';
 import { layoutPickups } from './race-course.js';
-import { ITEMS, ABILITIES, useAbility } from './race-items.js';
+import { ABILITIES, useAbility } from './race-items.js';
 import {
   makeKart,
   loadLogos,
@@ -36,14 +30,53 @@ import { makeEffects } from './kart-effects.js';
 import { animateKart, resetMotion } from './kart-motion.js';
 import { makeTrails } from './kart-trails.js';
 import { KEY_ACTIONS, readControls } from './kart-input.js';
-import { LEVELS, levelById } from './kart-levels.js';
+import { levelById } from './kart-levels.js';
+import { makeHud, formatTime } from './kart-hud.js';
+import * as GP from './gp.js';
+import {
+  renderDrivers,
+  renderGarage,
+  renderTracks,
+  renderResults,
+  renderTalks,
+  renderFinal,
+  helpHTML,
+  CREDITS_HTML
+} from './kart-menus.js';
+
 await document.fonts.load('900 80px Heebo');
 const $ = id => document.getElementById(id),
   arena = $('arena'),
   canvas = $('game');
-const level = levelById(new URLSearchParams(location.search).get('level'));
+
+// Persistence: settings, driver, mode and the Grand Prix in progress live in this browser only.
+const stored = (key, fallback) => {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+};
+const save = (key, value) => {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {}
+};
+const params = new URLSearchParams(location.search);
+let gp = GP.restore(stored('ck-gp', ''));
+let mode =
+  params.get('gp') === '1' || (params.get('gp') === null && stored('ck-mode', 'gp') === 'gp')
+    ? 'gp'
+    : 'single';
+// A Grand Prix race always runs on the course for its round.
+const level = levelById(
+  params.get('gp') === '1' && gp && !gp.done ? GP.currentLevel(gp) : params.get('level')
+);
 arena.classList.add('level-' + level.id);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const touchDevice = () => matchMedia('(pointer:coarse)').matches;
+
 let renderer;
 try {
   renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -77,8 +110,7 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 160 });
 sun.shadow.normalBias = 0.06;
-scene.add(sun);
-scene.add(sun.target);
+scene.add(sun, sun.target);
 const camera = new T.PerspectiveCamera(46, 1, 0.1, 420),
   track = makeTrack(level.id);
 track.shortcuts = level.id === 'jerusalem' ? makeShortcuts(track) : [];
@@ -89,66 +121,36 @@ buildShortcuts(world, track, box, label, mat);
 const gantryMeshes = new Set();
 world.userData.gantry.traverse(m => gantryMeshes.add(m));
 batchStatic(world, gantryMeshes);
-let selected = 0,
+
+let selected = clamp(Number(stored('ck-driver', '0')) || 0, 0, PARTIES.length - 1),
   state = 'home',
   race = null,
   count = 0,
   elapsed = 0,
   last = 0,
   toastUntil = 0,
-  sound = false,
+  feedbackUntil = 0,
+  sound = stored('ck-sound', 'off') === 'on',
   audio,
   previousRank = 6,
-  confetti = [];
+  confetti = [],
+  seenEvent = 0,
+  launchPressed = 99,
+  hudClock = 0,
+  lastLap = 0,
+  playerHits = {},
+  stateBeforePause = 'running';
+let sensitivity = clamp(Number(stored('ck-steering', '1')) || 1, 0.65, 1.35),
+  wideCamera = stored('ck-camera', 'wide') === 'wide';
+if (gp && gp.player !== undefined && mode === 'gp' && !gp.done) selected = gp.player;
+
 const heldKeys = new Set(),
   touchKeys = new Set();
 const controls = readControls(heldKeys, touchKeys);
-function syncControls() {
-  Object.assign(controls, readControls(heldKeys, touchKeys));
-}
-const compactTouchLayout = () =>
-  matchMedia('(max-width:650px), (pointer:coarse) and (max-width:1024px)').matches;
-function placePlay() {
-  const button = $('play'),
-    target = matchMedia('(max-width:650px)').matches
-      ? document.querySelector('.select-garage')
-      : document.querySelector('.hero-copy');
-  if (button.parentElement === target) return;
-  if (target.classList.contains('hero-copy')) target.insertBefore(button, target.querySelector('.micro'));
-  else target.append(button);
-}
-placePlay();
-addEventListener('resize', placePlay);
-const stored = (key, fallback) => {
-  try {
-    return localStorage.getItem(key) || fallback;
-  } catch {
-    return fallback;
-  }
-};
-const save = (key, value) => {
-  try {
-    localStorage.setItem(key, value);
-  } catch {}
-};
-let sensitivity = clamp(Number(stored('ck-steering', '1')) || 1, 0.65, 1.35),
-  wideCamera = stored('ck-camera', 'wide') === 'wide';
-$('steeringSensitivity').value = sensitivity;
-$('sensitivityValue').textContent = Math.round(sensitivity * 100) + '%';
-$('steeringSensitivity').oninput = e => {
-  sensitivity = Number(e.target.value);
-  save('ck-steering', sensitivity);
-  $('sensitivityValue').textContent = Math.round(sensitivity * 100) + '%';
-};
-function toggleCamera() {
-  wideCamera = !wideCamera;
-  save('ck-camera', wideCamera ? 'wide' : 'close');
-  toast(wideCamera ? 'מצלמה רחבה · רואים את הפנייה הבאה' : 'מצלמה קרובה · ישר לאקשן');
-}
-$('camera').onclick = toggleCamera;
-selected = clamp(Number(stored('ck-driver', '0')) || 0, 0, PARTIES.length - 1);
-sound = stored('ck-sound', 'off') === 'on';
-$('sound').setAttribute('aria-pressed', String(sound));
+const syncControls = () => Object.assign(controls, readControls(heldKeys, touchKeys));
+
+// Audio: short synthesized cues and an engine note that follows speed.
+let engineOsc, engineGain, engineFilter;
 function tone(freq = 500, duration = 0.12, type = 'triangle', volume = 0.045) {
   if (!sound) return;
   try {
@@ -166,51 +168,6 @@ function tone(freq = 500, duration = 0.12, type = 'triangle', volume = 0.045) {
     o.start();
     o.stop(audio.currentTime + duration);
   } catch {}
-}
-function toast(message) {
-  $('toast').textContent = message;
-  $('toast').classList.add('visible');
-  toastUntil = elapsed + 2.4;
-}
-function pulse(pattern = 16) {
-  if (compactTouchLayout() && navigator.vibrate) navigator.vibrate(pattern);
-}
-function prepareKart(g) {
-  const eyeMeshes = new Set();
-  g.userData.eyes.forEach(eye => eye.traverse(m => eyeMeshes.add(m)));
-  batchStatic(g.userData.head, eyeMeshes);
-  const dynamic = new Set([
-    g.userData.shield,
-    ...g.userData.flames,
-    g.userData.name,
-    ...g.userData.fx.map(f => f.mesh)
-  ]);
-  g.userData.flags.forEach(f => dynamic.add(f));
-  g.userData.head.traverse(m => dynamic.add(m));
-  // Merge the static chassis inside the sprung body so the suspension still moves it as one.
-  batchStatic(g.userData.body, dynamic);
-  return g;
-}
-const portraits = [];
-let seenEvent = 0,
-  launchPressed = 99,
-  feedbackUntil = 0,
-  engineOsc,
-  engineGain,
-  engineFilter;
-const logos = await loadLogos(),
-  karts = PARTIES.map((_, i) => {
-    const g = makeKart(i, logos);
-    prepareKart(g);
-    scene.add(g);
-    return g;
-  });
-const fx = makeEffects(scene, track, karts, reduced);
-const encounters = makeEncounterWorld(scene, track, box, label, mat);
-function feedback(text, kind = 'good') {
-  $('feedback').textContent = text;
-  $('feedback').className = 'race-feedback ' + kind;
-  feedbackUntil = elapsed + 1.35;
 }
 function updateEngine() {
   if (!audio) return;
@@ -232,44 +189,86 @@ function updateEngine() {
   engineOsc.frequency.setTargetAtTime(40 + (p?.speed || 0) * 2.5, audio.currentTime, 0.08);
   engineGain.gain.setTargetAtTime(active ? 0.016 : 0, audio.currentTime, 0.06);
 }
-// Small rendered portraits reuse the same 3D models as the race, not stock images.
-const thumbRenderer = new T.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
-thumbRenderer.setSize(300, 170);
-thumbRenderer.setPixelRatio(1);
-thumbRenderer.outputColorSpace = T.SRGBColorSpace;
-thumbRenderer.toneMapping = T.ACESFilmicToneMapping;
-thumbRenderer.toneMappingExposure = 1.3;
-const thumbScene = new T.Scene();
-thumbScene.add(new T.HemisphereLight('#fffbe2', '#94a587', 3));
-const light = new T.DirectionalLight('#fff8de', 4);
-light.position.set(4, 7, 5);
-thumbScene.add(light);
-const thumbCamera = new T.PerspectiveCamera(34, 300 / 170, 0.1, 50);
-thumbCamera.position.set(5.4, 4.3, 7.8);
-thumbCamera.lookAt(0, 1.5, 0);
-PARTIES.forEach((p, i) => {
-  const model = makeKart(i, logos);
-  thumbScene.add(model);
-  thumbRenderer.render(thumbScene, thumbCamera);
-  const image = thumbRenderer.domElement.toDataURL('image/png');
-  thumbCamera.position.set(0, 3.0, 4.9);
-  thumbCamera.lookAt(0, 2.88, 0);
-  thumbRenderer.render(thumbScene, thumbCamera);
-  portraits[i] = thumbRenderer.domElement.toDataURL('image/png');
-  thumbCamera.position.set(5.4, 4.3, 7.8);
-  thumbCamera.lookAt(0, 1.5, 0);
-  thumbScene.remove(model);
-  const button = document.createElement('button');
-  button.className = 'driver';
-  button.setAttribute('aria-label', p.leader + ' — ' + p.name);
-  button.setAttribute('aria-pressed', String(i === selected));
-  button.innerHTML = `<img class="portrait" src="${image}" alt="קארט ${p.name}"><img class="party-mark" src="./assets/${p.logo}" alt="סמל ${p.name}"><span class="selected-tick">✓</span><strong>${p.leader}</strong><small>${p.name}</small>`;
-  button.onclick = () => choose(i);
-  $('drivers').append(button);
-});
-thumbRenderer.dispose();
+function setSound(on) {
+  sound = on;
+  save('ck-sound', on ? 'on' : 'off');
+  $('sound').setAttribute('aria-pressed', String(on));
+  $('sound').setAttribute('aria-label', on ? 'כיבוי צליל' : 'הפעלת צליל');
+  $('soundToggle').checked = on;
+  tone(600, 0.14);
+}
+const pulse = (pattern = 16) => touchDevice() && navigator.vibrate?.(pattern);
+function toast(message) {
+  $('toast').textContent = message;
+  $('toast').classList.add('visible');
+  toastUntil = elapsed + 2.2;
+}
+function callout(text, kind = '') {
+  $('feedback').textContent = text;
+  $('feedback').className = 'callout ' + kind;
+  feedbackUntil = elapsed + 1.3;
+}
+
+function prepareKart(g) {
+  const eyeMeshes = new Set();
+  g.userData.eyes.forEach(eye => eye.traverse(m => eyeMeshes.add(m)));
+  batchStatic(g.userData.head, eyeMeshes);
+  const dynamic = new Set([
+    g.userData.shield,
+    ...g.userData.flames,
+    g.userData.name,
+    ...g.userData.fx.map(f => f.mesh)
+  ]);
+  g.userData.flags.forEach(f => dynamic.add(f));
+  g.userData.head.traverse(m => dynamic.add(m));
+  // Merge the static chassis inside the sprung body so the suspension still moves it as one.
+  batchStatic(g.userData.body, dynamic);
+  return g;
+}
+const logos = await loadLogos(),
+  karts = PARTIES.map((_, i) => {
+    const g = prepareKart(makeKart(i, logos));
+    scene.add(g);
+    return g;
+  });
+const fx = makeEffects(scene, track, karts, reduced);
+const encounters = makeEncounterWorld(scene, track, box, label, mat);
 const trails = makeTrails(scene, reduced);
-// Smoke, sparks and dust for every kart close enough to the camera to see it.
+const hud = makeHud({ arena, track, reduced, touch: touchDevice });
+
+// Portraits come from the same 3D models used on track: a kart three-quarter view and a head shot.
+const kartImages = [],
+  faceImages = [];
+{
+  const r = new T.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+  r.setSize(240, 240);
+  r.setPixelRatio(1);
+  r.outputColorSpace = T.SRGBColorSpace;
+  r.toneMapping = T.ACESFilmicToneMapping;
+  r.toneMappingExposure = 1.25;
+  const s = new T.Scene();
+  s.add(new T.HemisphereLight('#fffbe2', '#7c8aa0', 2.6));
+  const key = new T.DirectionalLight('#fff4de', 3.6);
+  key.position.set(4, 7, 6);
+  s.add(key);
+  const cam = new T.PerspectiveCamera(30, 1, 0.1, 50);
+  PARTIES.forEach((p, i) => {
+    const model = makeKart(i, logos);
+    s.add(model);
+    cam.position.set(5.6, 4.2, 7.4);
+    cam.lookAt(0, 1.4, 0);
+    r.render(s, cam);
+    kartImages[i] = r.domElement.toDataURL('image/png');
+    cam.position.set(0.6, 2.95, 3.6);
+    cam.lookAt(0, 2.75, 0);
+    r.render(s, cam);
+    faceImages[i] = r.domElement.toDataURL('image/png');
+    s.remove(model);
+  });
+  r.dispose();
+}
+
+// Trails: smoke, sparks and dust for every kart close enough to the camera to see it.
 function updateTrails(dt) {
   if (race && (state === 'running' || state === 'results'))
     for (const r of race.racers) {
@@ -279,11 +278,12 @@ function updateTrails(dt) {
     }
   trails.update(dt);
 }
+
+// Pickup meshes follow the same deterministic layout the race simulates, index for index.
 const pickups = [];
 const templates = Object.fromEntries(
   ['box', 'coin', 'barrier', 'boost', 'ramp'].map(k => [k, makePickup(k)])
 );
-// Meshes follow the same deterministic layout the race simulates, index for index.
 const bend = s => track.bend(s);
 for (const { type, s, x } of layoutPickups(track.length, bend)) {
   const mesh = templates[type].clone(true),
@@ -293,470 +293,15 @@ for (const { type, s, x } of layoutPickups(track.length, bend)) {
   scene.add(mesh);
   pickups.push({ type, s, x, mesh, baseY: p.y });
 }
-function clearControls() {
-  heldKeys.clear();
-  touchKeys.clear();
-  if (race) {
-    race.racers[0].steer = 0;
-    race.racers[0].lateral = 0;
-  }
-  for (const key in controls) controls[key] = false;
-  document.querySelectorAll('[data-key]').forEach(b => b.classList.remove('active'));
-}
-function choose(i) {
-  const changed = selected !== i;
-  selected = i;
-  save('ck-driver', i);
-  [...$('drivers').children].forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
-  $('driverFace').src = portraits[i];
-  $('driverFace').alt = PARTIES[i].leader;
-  $('driverNick').textContent = PARTIES[i].short;
-  $('rideName').textContent = PARTIES[i].ride;
-  $('rideTag').textContent = PARTIES[i].tag;
-  if (changed) pulse(20);
-  tone(380 + i * 60, 0.08);
-}
-function formatTime(t) {
-  return `${Math.floor(t / 60)
-    .toString()
-    .padStart(2, '0')}:${(t % 60).toFixed(2).padStart(5, '0')}`;
-}
-function renderLevels() {
-  $('levels').innerHTML = LEVELS.map(
-    item =>
-      `<button class="level-card" type="button" data-level="${item.id}" aria-pressed="${item.id === level.id}" style="--level-color:${item.color}"><span class="level-number">${item.number}</span><span class="level-copy"><strong>${item.name}</strong><small>${item.subtitle}</small></span><span class="level-rank"><b>${item.speed}</b><small>${item.badge}</small></span></button>`
-  ).join('');
-  for (const button of $('levels').children)
-    button.onclick = () => {
-      if (button.dataset.level === level.id) return;
-      const url = new URL(location.href);
-      url.searchParams.set('level', button.dataset.level);
-      location.assign(url.href);
-    };
-  $('currentTrackName').textContent = level.name;
-  $('currentTrackEnglish').textContent = level.english;
-  document.querySelector('.home-kicker>span:last-child').textContent = `LEVEL ${level.number} / 03`;
-  document.title = `${level.name} — קואליציה קארט`;
-  document.querySelector('.race-top small').textContent = level.name;
-  document.querySelector('.map-wrap>span').textContent = level.name;
-}
-function start() {
-  clearControls();
-  fx.reset();
-  trails.reset();
-  for (const mesh of dropMeshes.values()) mesh.removeFromParent();
-  dropMeshes.clear();
-  seenEvent = 0;
-  launchPressed = 99;
-  race = makeRace(selected, level.difficulty, Date.now(), track.length, track.shortcuts, level.id, { bend });
-  karts.forEach(resetMotion);
-  state = 'countdown';
-  count = 3.5;
-  previousRank = 6;
-  pickups.forEach(p => (p.mesh.visible = true));
-  confetti.forEach(p => scene.remove(p.mesh));
-  confetti = [];
-  for (const id of ['home', 'results', 'pauseScreen']) $(id).classList.add('hidden');
-  for (const id of ['hud', 'countdown', 'touch', 'raceHint']) $(id).classList.remove('hidden');
-  arena.classList.add('racing');
-  $('countdown').textContent = '3';
-  $('raceHint').textContent = compactTouchLayout()
-    ? 'הקישו גז כשהספירה מגיעה ל־1 לזינוק טורבו!'
-    : 'לחצו W / ↑ או גז כשהספירה מגיעה ל־1 לזינוק טורבו!';
-  pulse(28);
-  canvas.focus({ preventScroll: true });
-  resize();
-  updateKarts(0);
-  updateHUD();
-  setCamera(true);
-  tone(550, 0.15);
-}
-function goHome() {
-  fx.reset();
-  arena.classList.remove('boosting', 'hit-flash', 'shielded', 'magnetized', 'item-ready', 'launch-window');
-  state = 'home';
-  clearControls();
-  for (const id of ['hud', 'results', 'pauseScreen', 'countdown', 'touch']) $(id).classList.add('hidden');
-  $('home').classList.remove('hidden');
-  arena.classList.remove('racing');
-  karts.forEach(k => {
-    k.userData.name.visible = false;
-    k.userData.shield.visible = false;
-    k.userData.flames.forEach(f => (f.visible = false));
-  });
-  pickups.forEach(p => (p.mesh.visible = true));
-  resize();
-  $('play').focus({ preventScroll: true });
-}
-function pause() {
-  if (!['running', 'countdown'].includes(state)) return;
-  stateBeforePause = state;
-  state = 'paused';
-  clearControls();
-  $('pauseScreen').classList.remove('hidden');
-  $('resume').focus({ preventScroll: true });
-}
-let stateBeforePause = 'running';
-function resume() {
-  if (state !== 'paused') return;
-  state = stateBeforePause;
-  last = performance.now();
-  $('pauseScreen').classList.add('hidden');
-  canvas.focus({ preventScroll: true });
-}
-const itemNames = Object.fromEntries(Object.entries(ITEMS).map(([k, v]) => [k, [v.glyph, v.name]]));
-function activateAbility() {
-  if (state !== 'running') return;
-  const used = useAbility(race, race.racers[0]);
-  if (used) {
-    pulse([20, 30, 40]);
-    updateHUD();
-  }
-}
-function activateItem() {
-  if (state !== 'running') return;
-  const item = useItem(race, race.racers[0]);
-  if (item) {
-    if (compactTouchLayout()) navigator.vibrate?.(35);
-    updateHUD();
-  }
-}
-function consumeEvents() {
-  for (const e of race.events) {
-    if (e.seq <= seenEvent) continue;
-    seenEvent = e.seq;
-    // Effects for rivals only play when they happen near the player's kart.
-    if (e.player || Math.abs(e.s - race.racers[0].s) < 90) {
-      fx.event(e, race);
-      const kart = karts[e.id];
-      if (e.type === 'land') trails.puff(kart.position, '#d9ccad', e.trick ? 18 : 10, e.trick ? 5 : 3.5);
-      if (e.type === 'hit') trails.puff(kart.position.clone().setY(kart.position.y + 0.8), '#f1d9c2', 16, 5);
-    }
-    const me = e.id === selected;
-    if (e.type === 'noconf-fired' && e.target === selected) {
-      feedback('הצבעת אי־אמון נגדכם! חסינות לא תעזור', 'danger');
-      tone(180, 0.35, 'square');
-    }
-    if (e.type === 'poll-fired' && e.target === selected) {
-      feedback('סקר בדרך אליכם! הפעילו חסינות', 'danger');
-      tone(230, 0.2, 'square');
-    }
-    if (!me) continue;
-    const messages = {
-      jackpot: 'בונוס! 3 פתקים + טורבו',
-      'near-miss': 'כמעט! התחמקות = טורבו',
-      ram: 'בום! עקיפה בכוח הטורבו',
-      bump: 'מגע! שמרו על הקו',
-      'shortcut-enter': 'מצאתם דרך סודית!',
-      'shortcut-exit': 'חזרתם למרוץ!',
-      slipstream: 'סליפסטרים! עקיפה חכמה',
-      trick: 'סטייל! מתכוננים לנחיתה',
-      'shield-break': 'החסינות ספגה את הפגיעה',
-      'no-target': 'אין יריב בטווח הסקר',
-      'launch-boost': 'זינוק מושלם!',
-      leaked: 'הדלפה! לא רואים כלום…',
-      spun: 'ספין דוקטור! ההגה הפוך',
-      cleared: 'פינו לכם את הדרך — בכוח',
-      'drop-hit': 'נתקעתם בחסימה',
-      'ability-ready': ABILITIES[selected].name + ' מוכנה · E או הקשה על הפרצוף',
-      ability: ABILITIES[selected].name + '!',
-      warp: 'התפטרתם… וחזרתם קדימה!'
-    };
-    if (messages[e.type]) {
-      feedback(messages[e.type]);
-      tone(750, 0.18);
-    }
-    if (e.type === 'pickup') tone(900, 0.055);
-    if (e.type === 'boost-pad') tone(840, 0.2);
-    if (e.type === 'item-get') {
-      toast(
-        (compactTouchLayout() ? 'כוח מוכן: ' : '') +
-          itemNames[e.item][1] +
-          (compactTouchLayout() ? ' · געו במסלול להפעלה' : ' · לחצו רווח')
-      );
-      if (compactTouchLayout()) navigator.vibrate?.(45);
-      tone(570, 0.12);
-    }
-    if (e.type === 'budget') {
-      feedback('העברה תקציבית: +' + e.amount + ' פתקים');
-      tone(980, 0.16);
-    }
-    if (e.type === 'item-use') {
-      const msg = {
-        leak: 'ההדלפה פורסמה!',
-        spin: 'הספין יצא לדרך',
-        filibuster: 'פיליבסטר! חסמתם את הנתיב',
-        noconf: 'הצבעת אי־אמון יצאה לדרך',
-        budget: 'העברה תקציבית',
-        boost: 'טורבו הבטחות!',
-        shield: 'חסינות פעילה · 6 שניות',
-        magnet: 'מגנט מנדטים · 7 שניות',
-        poll: 'הסקר יצא לדרך!'
-      };
-      toast(msg[e.item]);
-      tone(e.item === 'boost' ? 880 : 550, 0.22);
-    }
-    if (e.type === 'hit') {
-      feedback(e.cause === 'barrier' ? 'נתקעתם במחסום. זה יעבור…' : 'ספין! חוזרים לעניינים…', 'danger');
-      tone(130, 0.24, 'sawtooth');
-    }
-    if (e.type === 'drift-charge') {
-      feedback(['', 'מיני טורבו מוכן', 'סופר טורבו מוכן', 'אולטרה טורבו מוכן!'][e.tier]);
-      tone(450 + e.tier * 210, 0.09);
-    }
-    if (e.type === 'land' && e.trick) {
-      feedback('נחיתה מושלמת! + טורבו');
-      tone(1100, 0.24);
-    }
-    if (e.type === 'jump') {
-      feedback(compactTouchLayout() ? 'הקישו דריפט באוויר לתרגיל!' : 'SHIFT באוויר = תרגיל!');
-      tone(680, 0.18);
-    }
-  }
-}
-function updateKarts(dt) {
-  if (!race) return;
-  const ctx = { elapsed, reduced, camera };
-  for (const r of race.racers) {
-    const kart = karts[r.id];
-    animateKart(kart, r, racerFrame(track, r), dt, ctx);
-    kart.userData.shield.visible = r.shield > 0 || r.magnet > 0 || r.star > 0;
-    kart.userData.shield.material.color.set(r.star > 0 ? '#ffd65c' : r.shield > 0 ? '#80e8fa' : '#ee8ce0');
-    kart.userData.shield.material.opacity = 0.12 + Math.sin(elapsed * 6) * 0.035;
-    for (const f of kart.userData.fx)
-      f.mesh.visible = reduced || Math.floor(elapsed * f.rate + (f.phase || 0)) % 2 === 0;
-    kart.visible = true;
-    kart.userData.name.visible = !r.player;
-    kart.userData.name.quaternion.copy(camera.quaternion).premultiply(kart.quaternion.clone().invert());
-  }
-}
-const camTarget = new T.Vector3();
-let camSwing = 0;
-function setCamera(snap = false, dt = 1 / 60) {
-  world.userData.gantry.visible = state !== 'home';
-  let position, look;
-  if (state === 'home') {
-    const featured = karts[selected];
-    PARTIES.forEach((p, i) => {
-      const k = karts[i];
-      k.visible = true;
-      k.scale.setScalar(i === selected ? 1.7 : 0.85);
-      const data = track.at(i === selected ? 8 : 23 + (i % 3) * 5, i === selected ? -1 : i % 2 ? 3 : -3);
-      k.position.copy(data.p);
-      k.rotation.set(0, Math.atan2(data.t.x, data.t.z) + Math.PI + (i === selected ? -0.2 : 0), 0);
-      k.userData.body.rotation.set(0, 0, 0);
-      k.userData.body.position.y = 0;
-      k.userData.body.scale.setScalar(1);
-    });
-    const focus = featured.position.clone(),
-      mobile = innerWidth <= 650;
-    position = focus.clone().add(new T.Vector3(mobile ? 12 : 15, mobile ? 10 : 10, -17));
-    look = focus.clone().add(new T.Vector3(mobile ? 0 : -5, mobile ? 1 : -1, 0));
-  } else if (race) {
-    const r = race.racers[0],
-      a = racerFrame(track, r),
-      ahead = racerFrame(track, r, wideCamera ? 17 : 12);
-    position = a.p.clone().addScaledVector(a.t, -(wideCamera ? 14.2 : 10.5));
-    position.y += wideCamera ? 7.8 : 5.8;
-    look = ahead.p.clone();
-    look.y += 1.0;
-    if (r.boost > 0 && !reduced) position.addScaledVector(a.t, -1);
-    // In a drift the camera swings to the outside so the slide angle reads; jumps lift it a touch.
-    const swingTarget = reduced ? 0 : r.drifting ? r.steer * 2.4 : r.steer * 0.6;
-    camSwing += (swingTarget - camSwing) * -Math.expm1(-dt * 3);
-    position.addScaledVector(a.right, camSwing);
-    look.addScaledVector(a.right, camSwing * 0.35);
-    if (r.air > 0) position.y += Math.sin((1 - r.air / r.airTotal) * Math.PI) * 1.4;
-  }
-  if (!position) return;
-  camera.position.lerp(position, snap ? 1 : -Math.expm1(-8 * dt));
-  camTarget.lerp(look, snap ? 1 : -Math.expm1(-10 * dt));
-  if (fx.shake > 0 && !reduced)
-    camera.position.add(
-      new T.Vector3(Math.sin(elapsed * 77) * fx.shake * 0.5, Math.cos(elapsed * 61) * fx.shake * 0.25, 0)
-    );
-  camera.lookAt(camTarget);
-  const desiredFov =
-    state === 'home'
-      ? innerWidth <= 650
-        ? 47
-        : 46
-      : (innerWidth <= 650 ? 57 : wideCamera ? 55 : 49) + (race?.racers[0].boost > 0 && !reduced ? 5 : 0);
-  camera.fov += (desiredFov - camera.fov) * (snap ? 1 : -Math.expm1(-dt * 5));
-  camera.updateProjectionMatrix();
-  const focus = state === 'home' ? karts[selected].position : racerFrame(track, race.racers[0]).p;
-  sun.position.copy(focus).add(new T.Vector3(-25, 55, -30));
-  sun.target.position.copy(focus);
-}
-function resize() {
-  const rect = arena.getBoundingClientRect();
-  renderer.setSize(rect.width, rect.height, false);
-  trails.resize(rect.height * renderer.getPixelRatio());
-  camera.aspect = rect.width / rect.height;
-  camera.fov = innerWidth <= 650 ? (state === 'home' ? 47 : 54) : 46;
-  camera.updateProjectionMatrix();
-}
-new ResizeObserver(resize).observe(arena);
-resize();
-const map = $('minimap').getContext('2d'),
-  mapBounds = new T.Box3().setFromPoints(
-    Array.from({ length: 120 }, (_, i) => track.at((i / 120) * track.length).p)
-  );
-function drawMap() {
-  map.clearRect(0, 0, 240, 180);
-  const project = p => ({
-    x: 22 + ((p.x - mapBounds.min.x) / (mapBounds.max.x - mapBounds.min.x)) * 196,
-    y: 168 - ((p.z - mapBounds.min.z) / (mapBounds.max.z - mapBounds.min.z)) * 154
-  });
-  map.beginPath();
-  for (let i = 0; i <= 100; i++) {
-    const p = project(track.at((i / 100) * track.length).p);
-    if (!i) map.moveTo(p.x, p.y);
-    else map.lineTo(p.x, p.y);
-  }
-  map.strokeStyle = '#526c5366';
-  map.lineWidth = 11;
-  map.lineJoin = 'round';
-  map.stroke();
-  map.strokeStyle = '#e8f0cf';
-  map.lineWidth = 6;
-  map.stroke();
-  map.save();
-  map.setLineDash([3, 4]);
-  map.lineWidth = 2;
-  map.strokeStyle = '#e8a9cb';
-  for (const route of track.shortcuts) {
-    map.beginPath();
-    for (let i = 0; i <= 30; i++) {
-      const p = project(route.at((i / 30) * route.length).p);
-      if (!i) map.moveTo(p.x, p.y);
-      else map.lineTo(p.x, p.y);
-    }
-    map.stroke();
-  }
-  map.restore();
-  for (const r of [...race.racers].reverse()) {
-    const p = project(racerFrame(track, r).p);
-    map.beginPath();
-    map.arc(p.x, p.y, r.player ? 5 : 3.5, 0, Math.PI * 2);
-    map.fillStyle = PARTIES[r.id].color;
-    map.fill();
-    map.strokeStyle = r.player ? '#fffde7' : '#486343';
-    map.lineWidth = r.player ? 2 : 1;
-    map.stroke();
-  }
-}
-let hudClock = 0;
-function updateHUD() {
-  const p = race.racers[0],
-    order = ranking(race),
-    position = order.indexOf(p) + 1;
-  $('position').innerHTML = position + '<span>/6</span>';
-  $('lap').textContent = `הקפה ${Math.min(LAPS, Math.floor(Math.max(0, p.s) / track.length) + 1)} / ${LAPS}`;
-  $('clock').textContent = formatTime(race.time);
-  const sector = track.sectors[sectorAt(p.s, track.length)];
-  $('sectorName').textContent = sector.name;
-  $('sectorName').style.setProperty('--sector', sector.color);
-  $('lapProgress').style.width = ((Math.max(0, p.s) % track.length) / track.length) * 100 + '%';
-  arena.classList.toggle('boosting', p.boost > 0 && !reduced);
-  arena.classList.toggle('hit-flash', p.stun > 0 && !reduced);
-  arena.classList.toggle('shielded', p.shield > 0);
-  arena.classList.toggle('magnetized', p.magnet > 0);
-  arena.classList.toggle('leaked', p.blind > 0 && !reduced);
-  arena.classList.toggle('confused', p.confused > 0);
-  arena.classList.toggle('starred', p.star > 0);
-  const abilityButton = $('ability');
-  abilityButton.style.setProperty('--charge', p.ability.toFixed(3));
-  abilityButton.classList.toggle('ready', p.ability >= 1);
-  $('abilityName').textContent = ABILITIES[selected].name + (compactTouchLayout() ? '' : ' · E');
-  abilityButton.setAttribute(
-    'aria-label',
-    ABILITIES[selected].name + (p.ability >= 1 ? ' — מוכנה' : ' — ' + Math.round(p.ability * 100) + '%')
-  );
-  $('effectStatus').textContent =
-    p.confused > 0
-      ? '↻ ההגה הפוך'
-      : p.star > 0
-        ? '✦ ' + Math.ceil(p.star) + 's'
-        : p.routeId
-          ? '✦ דרך סודית'
-          : p.magnet > 0
-            ? '🧲 ' + Math.ceil(p.magnet) + 's'
-            : p.shield > 0
-              ? '◉ ' + Math.ceil(p.shield) + 's'
-              : p.air > 0
-                ? '↑ באוויר'
-                : '';
-  if (p.routeId) $('sectorName').textContent = track.shortcuts.find(r => r.id === p.routeId).name;
-  $('speed').textContent = Math.round(p.speed * 4);
-  $('speedFill').style.width = (p.speed / 47) * 100 + '%';
-  $('coins').textContent = `${p.coins} / 10 פתקים`;
-  $('driftFill').style.width = (p.charge / 3) * 100 + '%';
-  $('driftFill').style.background = p.charge > 2.4 ? '#e797ff' : p.charge > 1.6 ? '#f5b04f' : '#7cebf9';
-  $('driftLabel').textContent = p.drifting
-    ? p.charge > 2.4
-      ? 'אולטרה טורבו! שחררו SHIFT'
-      : p.charge > 1.6
-        ? 'סופר טורבו! שחררו SHIFT'
-        : p.charge > 0.65
-          ? 'טורבו מוכן · שחררו SHIFT'
-          : 'טוענים דריפט…'
-    : p.boost > 0
-      ? 'טורבו! יאללה לעקוף'
-      : p.shield > 0
-        ? 'חסינות פעילה'
-        : Math.abs(p.x) > ROAD.driveEdge
-          ? 'חזרו לכביש! הדשא מאט'
-          : p.routeId
-            ? 'דרך סודית · שמרו על הקו'
-            : p.air > 0
-              ? 'SHIFT באוויר = תרגיל'
-              : p.slipstream > 0.2
-                ? 'טוענים סליפסטרים…'
-                : 'SHIFT + פנייה = דריפט';
-  document.querySelector('.drift-meter').classList.toggle('active', p.drifting || p.boost > 0);
-  if (compactTouchLayout()) {
-    $('coins').textContent = `◉ ${p.coins}`;
-    $('driftLabel').textContent = $('driftLabel').textContent.replaceAll('SHIFT', 'כפתור דריפט');
-    if (state === 'countdown') $('raceHint').textContent = 'לחצו גז כשהספירה מגיעה ל־1 לזינוק טורבו';
-    else $('raceHint').classList.add('hidden');
-  }
-  const item = itemNames[p.item];
-  $('itemIcon').textContent = item ? item[0] : '?';
-  $('itemName').textContent = item ? item[1] : 'אספו קופסת קמפיין';
-  $('item').classList.toggle('ready', !!item);
-  arena.classList.toggle('item-ready', !!item);
-  $('item').setAttribute(
-    'aria-label',
-    item
-      ? 'הפעל ' + item[1] + (compactTouchLayout() ? '; אפשר גם לגעת במסלול' : '')
-      : 'אין אביזר — אספו קופסת קמפיין'
-  );
-  $('leaderboard').innerHTML = order
-    .map(
-      (r, i) =>
-        `<div class="leader-row ${r.player ? 'me' : ''}" style="--color:${PARTIES[r.id].color}"><b>${i + 1}</b><i></i><span>${PARTIES[r.id].short}</span><small>${r.player ? 'אתם' : r.finish !== null ? 'סיים' : ''}</small></div>`
-    )
-    .join('');
-  drawMap();
-  if (position < previousRank && race.time > 4 && state === 'running') {
-    tone(700, 0.07);
-    feedback(position === 1 ? 'מקום ראשון! שומרים על הכיסא.' : `עקיפה! מקום ${position} מתוך 6`);
-    pulse(position === 1 ? [30, 45, 40] : 24);
-  }
-  previousRank = position;
-}
-// The race owns pickups; meshes only mirror whether each one is currently collectable.
 function syncPickups() {
   race.pickups.forEach((p, i) => (pickups[i].mesh.visible = p.hiddenUntil <= race.time));
   syncDrops();
 }
-// Filibuster and protest roadblocks, kept in step with race.drops.
+// Filibuster lecterns and protest barricades, kept in step with race.drops.
 const dropMeshes = new Map();
 function makeDrop(kind) {
   const g = new T.Group();
   if (kind === 'filibuster') {
-    // A lectern buried in paper: the speech that never ends.
     box(g, 1.1, 1.15, 0.7, '#6d4a33', 0, 0.58, 0);
     box(g, 1.3, 0.12, 0.85, '#8a6143', 0, 1.2, 0);
     for (let i = 0; i < 7; i++) {
@@ -776,7 +321,6 @@ function makeDrop(kind) {
     sign.position.set(0, 1.62, 0);
     g.add(sign);
   } else {
-    // Protest: placards on sticks and a cardboard barrier.
     box(g, 2.2, 0.55, 0.16, '#d9c39a', 0, 0.3, 0);
     for (let i = 0; i < 3; i++) {
       box(g, 0.06, 1.7, 0.06, '#8b6b4a', (i - 1) * 0.75, 0.9, 0);
@@ -814,47 +358,301 @@ function syncDrops() {
       dropMeshes.delete(id);
     }
 }
+function clearDrops() {
+  for (const mesh of dropMeshes.values()) mesh.removeFromParent();
+  dropMeshes.clear();
+}
+
+function clearControls() {
+  heldKeys.clear();
+  touchKeys.clear();
+  if (race) {
+    race.racers[0].steer = 0;
+    race.racers[0].lateral = 0;
+  }
+  for (const key in controls) controls[key] = false;
+  document.querySelectorAll('[data-key]').forEach(b => b.classList.remove('active'));
+}
+
+// ——— Title screen ———
+function choose(i) {
+  if (mode === 'gp' && gp && !gp.done && gp.round > 0) return toast('בעונה פעילה אי אפשר להחליף נהג');
+  const changed = selected !== i;
+  selected = i;
+  save('ck-driver', i);
+  renderGarage(i);
+  $('driverFace').src = faceImages[i];
+  if (changed) pulse(20);
+  tone(380 + i * 60, 0.08);
+}
+function setMode(next) {
+  mode = next;
+  save('ck-mode', next);
+  for (const b of document.querySelectorAll('.mode'))
+    b.setAttribute('aria-checked', String(b.dataset.mode === next));
+  $('trackPicker').classList.toggle('hidden', next !== 'single');
+  $('playLabel').textContent = next === 'gp' ? 'מתחילים עונה' : 'לזינוק';
+}
+function pickTrack(id) {
+  if (id === level.id) return;
+  const url = new URL(location.href);
+  url.searchParams.set('level', id);
+  url.searchParams.delete('gp');
+  url.searchParams.delete('go');
+  location.replace(url.href);
+}
+// Moving between courses reloads the page (each course builds its own world).
+function goToRace(levelId, gpRace) {
+  const url = new URL(location.href);
+  url.searchParams.set('level', levelId);
+  url.searchParams.set('gp', gpRace ? '1' : '0');
+  url.searchParams.set('go', '1');
+  if (levelId === level.id && (gpRace ? 'gp' : 'single') === mode) {
+    history.replaceState(null, '', url.href);
+    return startRace_();
+  }
+  location.assign(url.href);
+}
+function refreshResumeCard() {
+  const active = gp && !gp.done && gp.round > 0;
+  $('resumeCard').classList.toggle('hidden', !active);
+  if (active)
+    $('resumeTitle').textContent =
+      `${PARTIES[gp.player].short} · מרוץ ${gp.round + 1} מתוך ${GP.GP_RACES.length}, ${GP.coalitionSeats(gp)} מנדטים`;
+}
+function play() {
+  if (mode === 'single') return startRace_();
+  if (!gp || gp.done || gp.player !== selected || gp.round === 0) {
+    gp = GP.newGrandPrix(selected);
+    saveGp();
+  }
+  if (gp.talksPending) return showTalks();
+  goToRace(GP.currentLevel(gp), true);
+}
+const saveGp = () => save('ck-gp', gp ? JSON.stringify(gp) : null);
+
+// ——— Race lifecycle ———
+function startRace_() {
+  clearControls();
+  fx.reset();
+  trails.reset();
+  clearDrops();
+  hud.reset();
+  seenEvent = 0;
+  launchPressed = 99;
+  playerHits = {};
+  lastLap = 0;
+  const inGp = mode === 'gp' && gp && !gp.done;
+  race = makeRace(selected, level.difficulty, Date.now(), track.length, track.shortcuts, level.id, {
+    bend,
+    ...(inGp ? GP.raceOptions(gp) : {})
+  });
+  karts.forEach(resetMotion);
+  karts.forEach(k => k.scale.setScalar(1));
+  state = 'countdown';
+  count = 3.5;
+  previousRank = 6;
+  pickups.forEach(p => (p.mesh.visible = true));
+  confetti.forEach(p => scene.remove(p.mesh));
+  confetti = [];
+  for (const id of ['home', 'results', 'pauseScreen', 'talks', 'final']) $(id).classList.add('hidden');
+  for (const id of ['hud', 'countdown', 'raceHint']) $(id).classList.remove('hidden');
+  $('touch').classList.toggle('hidden', !touchDevice());
+  $('coalitionMeter').classList.toggle('hidden', !inGp);
+  arena.classList.add('racing');
+  $('countdown').textContent = '3';
+  $('raceHint').textContent = touchDevice()
+    ? 'הקישו גז בדיוק כשמופיע 1 — זינוק טורבו'
+    : 'לחצו W בדיוק כשמופיע 1 — זינוק טורבו';
+  hud.resetTicker(
+    inGp
+      ? `${level.name} · מרוץ ${gp.round + 1} מתוך ${GP.GP_RACES.length}`
+      : `${level.name} · ${level.speed}`
+  );
+  if (inGp && race.handicap) {
+    const asks = gp.coalition.map(id => GP.DEMANDS[GP.ASKS[id]].name);
+    if (asks.length) hud.tick('דרישות השותפים בתוקף: ' + asks.join(', '), 3, 0);
+  }
+  pulse(28);
+  canvas.focus({ preventScroll: true });
+  resize();
+  updateKarts(0);
+  updateHUD();
+  setCamera(true);
+  tone(550, 0.15);
+}
+function goHome() {
+  fx.reset();
+  clearDrops();
+  arena.classList.remove(
+    'boosting',
+    'hit-flash',
+    'leaked',
+    'confused',
+    'starred',
+    'item-ready',
+    'launch-window',
+    'racing'
+  );
+  state = 'home';
+  race = null;
+  clearControls();
+  for (const id of ['hud', 'results', 'pauseScreen', 'countdown', 'touch', 'talks', 'final'])
+    $(id).classList.add('hidden');
+  $('home').classList.remove('hidden');
+  karts.forEach(k => {
+    k.userData.name.visible = false;
+    k.userData.shield.visible = false;
+    k.userData.flames.forEach(f => (f.visible = false));
+  });
+  pickups.forEach(p => (p.mesh.visible = true));
+  refreshResumeCard();
+  resize();
+  $('play').focus({ preventScroll: true });
+}
+function pause() {
+  if (!['running', 'countdown'].includes(state)) return;
+  stateBeforePause = state;
+  state = 'paused';
+  clearControls();
+  $('pauseScreen').classList.remove('hidden');
+  $('restart').classList.toggle('hidden', mode === 'gp');
+  $('resume').focus({ preventScroll: true });
+}
+function resume() {
+  if (state !== 'paused') return;
+  state = stateBeforePause;
+  last = performance.now();
+  $('pauseScreen').classList.add('hidden');
+  canvas.focus({ preventScroll: true });
+}
+function activateItem() {
+  if (state !== 'running') return;
+  if (useItem(race, race.racers[0])) {
+    pulse(35);
+    updateHUD();
+  }
+}
+function activateAbility() {
+  if (state !== 'running') return;
+  if (useAbility(race, race.racers[0])) {
+    pulse([20, 30, 40]);
+    updateHUD();
+  }
+}
+function toggleCamera() {
+  wideCamera = !wideCamera;
+  save('ck-camera', wideCamera ? 'wide' : 'close');
+  $('wideToggle').checked = wideCamera;
+  toast(wideCamera ? 'מצלמה רחבה' : 'מצלמה קרובה');
+}
+
+// Race events drive effects, sounds, the ticker and the player's callouts.
+const PLAYER_CALLOUTS = {
+  jackpot: ['שער זהב · 3 פתקים', 'gold'],
+  'shortcut-enter': ['דרך סודית'],
+  slipstream: ['סליפסטרים'],
+  'shield-break': ['החסינות ספגה את המכה'],
+  'launch-boost': ['זינוק מושלם', 'gold'],
+  leaked: ['הדלפה! לא רואים כלום', 'danger'],
+  spun: ['ההגה הפוך', 'danger'],
+  cleared: ['פינו אתכם מהדרך', 'danger'],
+  'ability-ready': [null, 'gold'],
+  warp: ['התפטרתם… וחזרתם קדימה', 'gold'],
+  veto: ['וטו של השותפים: הקלפי ריקה', 'danger']
+};
+function consumeEvents() {
+  for (const e of race.events) {
+    if (e.seq <= seenEvent) continue;
+    seenEvent = e.seq;
+    if (e.player || Math.abs(e.s - race.racers[0].s) < 90) {
+      fx.event(e, race);
+      const kart = karts[e.id];
+      if (e.type === 'land') trails.puff(kart.position, '#d9ccad', e.trick ? 18 : 10, e.trick ? 5 : 3.5);
+      if (e.type === 'hit') trails.puff(kart.position.clone().setY(kart.position.y + 0.8), '#f1d9c2', 16, 5);
+    }
+    hud.onEvent(e, race, elapsed);
+    // Friendly fire counts against coalition loyalty.
+    const fromMe = e.from === selected || (e.type === 'ram' && e.player);
+    if (fromMe) {
+      const victim = e.type === 'ram' ? e.target : e.id;
+      if (['hit', 'ram', 'leaked', 'spun', 'drop-hit'].includes(e.type) && victim !== selected)
+        playerHits[victim] = (playerHits[victim] ?? 0) + 1;
+    }
+    if ((e.type === 'noconf-fired' || e.type === 'poll-fired') && e.target === selected) {
+      callout(e.type === 'noconf-fired' ? 'הצבעת אי־אמון נגדכם' : 'סקר בדרך אליכם', 'danger');
+      tone(200, 0.3, 'square');
+    }
+    if (!e.player) continue;
+    const c = PLAYER_CALLOUTS[e.type];
+    if (c) {
+      callout(
+        e.type === 'ability-ready'
+          ? `${ABILITIES[selected].name} מוכנה · ${touchDevice() ? 'הקישו על הפנים' : 'E'}`
+          : c[0],
+        c[1]
+      );
+      tone(e.type === 'ability-ready' ? 980 : 750, 0.18);
+    }
+    if (e.type === 'ability') {
+      callout(ABILITIES[selected].name, 'gold');
+      tone(1200, 0.3);
+    }
+    if (e.type === 'pickup') tone(900, 0.05);
+    if (e.type === 'boost-pad') tone(840, 0.18);
+    if (e.type === 'item-get') {
+      tone(570, 0.12);
+      pulse(40);
+    }
+    if (e.type === 'item-use') tone(e.item === 'boost' ? 880 : 550, 0.2);
+    if (e.type === 'hit') {
+      callout(e.cause === 'barrier' ? 'מחסום' : e.cause === 'noconf' ? 'אי־אמון' : 'ספין', 'danger');
+      tone(130, 0.24, 'sawtooth');
+    }
+    if (e.type === 'drift-boost') tone(700 + e.tier * 160, 0.16);
+    if (e.type === 'land' && e.trick) {
+      callout('נחיתה מושלמת', 'gold');
+      tone(1100, 0.22);
+    }
+    if (e.type === 'jump') tone(680, 0.16);
+  }
+}
+
 function finish() {
   state = 'results';
   clearControls();
-  $('results').classList.remove('hidden');
   $('touch').classList.add('hidden');
   const player = race.racers[0],
     order = ranking(race),
     place = order.indexOf(player) + 1,
     key = 'ck-v3-best-' + (level.id === 'jerusalem' ? 'normal' : level.id);
   let best = Number(stored(key, '0'));
-  if (!best || race.time < best) {
-    best = race.time;
+  if (!best || player.finish < best) {
+    best = player.finish;
     save(key, best);
   }
-  $('resultMedal').textContent = place === 1 ? '♛' : place;
-  $('resultTitle').textContent =
-    place === 1 ? 'יש ראש ממשלה!' : place <= 3 ? 'יש מקום בקואליציה.' : 'הפעם באופוזיציה.';
-  $('resultJoke').textContent =
-    place === 1
-      ? `${PARTIES[selected].short} ניצח ב${level.name}. עכשיו צריך למצוא חניה לכנסת.`
-      : place <= 3
-        ? 'פודיום יפה. תיק התחבורה עוד על השולחן.'
-        : 'הבוחרים ביקשו שינוי. אולי תתחילו מהצמיגים?';
-  $('resultTime').textContent = formatTime(race.time);
-  $('resultDrifts').textContent = race.drifts;
-  $('resultSecrets').textContent = race.shortcuts;
-  $('resultBest').textContent = formatTime(best);
-  $('resultsBoard').innerHTML = order
-    .map((r, i) => {
-      const party = PARTIES[r.id];
-      return `<li class="results-row ${r.player ? 'me' : ''} ${i === 0 ? 'winner' : ''}" style="--party-color:${party.color}"><span class="results-rank">${i + 1}</span><img class="results-face" src="${portraits[r.id]}" alt=""><span class="results-driver"><b>${party.leader}${r.player ? '<em>אתם</em>' : ''}</b><small>${party.name}</small></span><span class="results-time">${i === 0 ? formatTime(r.finish ?? r.projected) : '+' + ((r.finish ?? r.projected) - (order[0].finish ?? order[0].projected)).toFixed(2)}</span></li>`;
-    })
-    .join('');
-  $('resultsBoard').scrollTop = 0;
+  const inGp = mode === 'gp' && gp && !gp.done;
+  let gained = null;
+  if (inGp) {
+    gained = GP.awardSeats(
+      gp,
+      order.map(r => r.id),
+      playerHits
+    );
+    gp.talksPending = !gp.done;
+    saveGp();
+  }
+  renderResults({ race, order, images: faceImages, place, best, level, gp: inGp ? gp : null, gained });
+  $('again').textContent = inGp ? (gp.done ? 'לספירת המנדטים' : 'למשא ומתן') : 'עוד מרוץ';
+  $('homeButton').textContent = 'לתפריט';
+  $('results').classList.remove('hidden');
   tone(place === 1 ? 1000 : 360, 0.5);
   if (place === 1 && !reduced) {
     const origin = karts[selected].position;
     for (let i = 0; i < 65; i++) {
       const m = new T.Mesh(
         new T.BoxGeometry(0.13, 0.27, 0.05),
-        mat(['#f2d867', '#df835d', '#80bec5', '#eaf3be'][i % 4])
+        mat(['#f2c14e', '#e5383b', '#2f6fe4', '#f3efe4'][i % 4])
       );
       m.position
         .copy(origin)
@@ -869,6 +667,172 @@ function finish() {
   }
   $('again').focus({ preventScroll: true });
 }
+function afterResults() {
+  if (mode === 'gp' && gp) {
+    if (gp.done) return showFinal();
+    return showTalks();
+  }
+  startRace_();
+}
+
+// ——— Grand Prix screens ———
+let talkNotices = [];
+function showTalks() {
+  state = 'talks';
+  if (gp.talksPending && !gp.defectionsChecked) {
+    const gone = GP.defections(gp);
+    talkNotices = gone.map(id => `${PARTIES[id].name} פרשה מהקואליציה.`);
+    gp.defectionsChecked = true;
+    saveGp();
+  }
+  for (const id of ['home', 'results', 'hud', 'touch']) $(id).classList.add('hidden');
+  $('talks').classList.remove('hidden');
+  const draw = () =>
+    renderTalks(gp, {
+      notices: talkNotices,
+      onInvite: id => {
+        if (GP.invite(gp, id)) {
+          saveGp();
+          tone(880, 0.15);
+          draw();
+        }
+      },
+      onDismiss: id => {
+        GP.dismiss(gp, id);
+        saveGp();
+        tone(300, 0.15);
+        draw();
+      }
+    });
+  draw();
+  $('nextRace').focus({ preventScroll: true });
+}
+function nextRace() {
+  gp.talksPending = false;
+  gp.defectionsChecked = false;
+  talkNotices = [];
+  saveGp();
+  goToRace(GP.currentLevel(gp), true);
+}
+function showFinal() {
+  state = 'final';
+  for (const id of ['results', 'hud', 'touch', 'talks']) $(id).classList.add('hidden');
+  $('final').classList.remove('hidden');
+  const v = renderFinal(gp);
+  tone(v.formed ? 1200 : 220, 0.6);
+  $('newSeason').focus({ preventScroll: true });
+}
+
+// ——— Karts and camera ———
+function updateKarts(dt) {
+  if (!race) return;
+  const ctx = { elapsed, reduced, camera };
+  for (const r of race.racers) {
+    const kart = karts[r.id];
+    animateKart(kart, r, racerFrame(track, r), dt, ctx);
+    kart.userData.shield.visible = r.shield > 0 || r.magnet > 0 || r.star > 0;
+    kart.userData.shield.material.color.set(r.star > 0 ? '#ffd65c' : r.shield > 0 ? '#80e8fa' : '#ee8ce0');
+    kart.userData.shield.material.opacity = 0.12 + Math.sin(elapsed * 6) * 0.035;
+    for (const f of kart.userData.fx)
+      f.mesh.visible = reduced || Math.floor(elapsed * f.rate + (f.phase || 0)) % 2 === 0;
+    kart.visible = true;
+    kart.userData.name.visible = !r.player;
+    kart.userData.name.quaternion.copy(camera.quaternion).premultiply(kart.quaternion.clone().invert());
+  }
+}
+const camTarget = new T.Vector3();
+let camSwing = 0;
+const compact = () => innerWidth <= 760;
+function setCamera(snap = false, dt = 1 / 60) {
+  world.userData.gantry.visible = state !== 'home';
+  let position, look;
+  if (state === 'home' || !race) {
+    // Title: the chosen kart up front, the rest of the grid behind, slowly circled.
+    PARTIES.forEach((p, i) => {
+      const k = karts[i];
+      k.visible = true;
+      k.scale.setScalar(i === selected ? 1.6 : 0.9);
+      const data = track.at(i === selected ? 8 : 22 + (i % 3) * 6, i === selected ? 0 : i % 2 ? 4 : -4);
+      k.position.copy(data.p);
+      k.rotation.set(0, Math.atan2(data.t.x, data.t.z) + Math.PI, 0);
+      k.userData.body.rotation.set(0, 0, 0);
+      k.userData.body.position.y = 0;
+      k.userData.body.scale.setScalar(1);
+    });
+    const focus = karts[selected].position.clone(),
+      a = track.at(8),
+      orbit = reduced ? 0.6 : 0.6 + Math.sin(elapsed * 0.12) * 0.35;
+    const side = new T.Vector3(-a.t.z, 0, a.t.x);
+    // Phones frame the kart in the top part of the screen, above the menu cards.
+    const portrait = innerHeight > innerWidth,
+      short = innerHeight < 560,
+      radius = portrait ? 21 : short ? 19 : 15;
+    position = focus
+      .clone()
+      .addScaledVector(a.t, -Math.cos(orbit) * radius)
+      .addScaledVector(side, Math.sin(orbit) * radius);
+    position.y += portrait ? 8 : 6.5;
+    look = focus.clone().add(new T.Vector3(0, portrait ? -3.4 : short ? 0.4 : 2.2, 0));
+  } else {
+    const r = race.racers[0],
+      a = racerFrame(track, r),
+      ahead = racerFrame(track, r, wideCamera ? 17 : 12);
+    position = a.p.clone().addScaledVector(a.t, -(wideCamera ? 14.2 : 10.5));
+    position.y += wideCamera ? 7.8 : 5.8;
+    look = ahead.p.clone();
+    look.y += 1.0;
+    if (r.boost > 0 && !reduced) position.addScaledVector(a.t, -1);
+    // In a drift the camera swings to the outside so the slide angle reads; jumps lift it a touch.
+    const swingTarget = reduced ? 0 : r.drifting ? r.steer * 2.4 : r.steer * 0.6;
+    camSwing += (swingTarget - camSwing) * -Math.expm1(-dt * 3);
+    position.addScaledVector(a.right, camSwing);
+    look.addScaledVector(a.right, camSwing * 0.35);
+    if (r.air > 0) position.y += Math.sin((1 - r.air / r.airTotal) * Math.PI) * 1.4;
+  }
+  camera.position.lerp(position, snap ? 1 : -Math.expm1(-8 * dt));
+  camTarget.lerp(look, snap ? 1 : -Math.expm1(-10 * dt));
+  if (fx.shake > 0 && !reduced)
+    camera.position.add(
+      new T.Vector3(Math.sin(elapsed * 77) * fx.shake * 0.5, Math.cos(elapsed * 61) * fx.shake * 0.25, 0)
+    );
+  camera.lookAt(camTarget);
+  const desiredFov =
+    state === 'home' || !race
+      ? innerHeight > innerWidth
+        ? 58
+        : 42
+      : (compact() ? 60 : wideCamera ? 55 : 49) + (race.racers[0].boost > 0 && !reduced ? 5 : 0);
+  camera.fov += (desiredFov - camera.fov) * (snap ? 1 : -Math.expm1(-dt * 5));
+  camera.updateProjectionMatrix();
+  const focus = state === 'home' || !race ? karts[selected].position : racerFrame(track, race.racers[0]).p;
+  sun.position.copy(focus).add(new T.Vector3(-25, 55, -30));
+  sun.target.position.copy(focus);
+}
+function resize() {
+  const rect = arena.getBoundingClientRect();
+  renderer.setSize(rect.width, rect.height, false);
+  trails.resize(rect.height * renderer.getPixelRatio());
+  camera.aspect = rect.width / rect.height;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(arena);
+resize();
+
+function updateHUD() {
+  const position = hud.update(race, {
+    selected,
+    gp: mode === 'gp' && gp ? gp : null,
+    coalitionSeats: gp ? GP.coalitionSeats(gp) : 0,
+    now: elapsed
+  });
+  if (position < previousRank && race.time > 4 && state === 'running') {
+    tone(700, 0.07);
+    if (position === 1) callout('מקום ראשון', 'gold');
+    pulse(position === 1 ? [30, 45, 40] : 24);
+  }
+  previousRank = position;
+}
+
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000 || 0.016);
@@ -877,7 +841,7 @@ function frame(now) {
   if (state === 'countdown') {
     const old = Math.ceil(count);
     count -= dt;
-    $('countdown').textContent = count > 0.5 ? Math.ceil(count - 0.5) : 'GO!';
+    $('countdown').textContent = count > 0.5 ? Math.ceil(count - 0.5) : 'צא!';
     arena.classList.toggle('launch-window', count <= 1.5 && count > 0.45);
     if (Math.ceil(count) !== old) {
       tone(count > 0.5 ? 540 : 1000, 0.12);
@@ -886,17 +850,17 @@ function frame(now) {
     if (count <= 0) {
       state = 'running';
       arena.classList.remove('launch-window');
-      $('raceHint').textContent = 'W / ↑ גז · A D / ← → היגוי · SHIFT דריפט / תרגיל באוויר · רווח אביזר';
       startRace(race, launchPressed >= 0.45 && launchPressed <= 1.15);
       $('countdown').classList.add('hidden');
+      $('raceHint').textContent = touchDevice()
+        ? ''
+        : 'W גז · A D היגוי · Shift דריפט · רווח אביזר · E יכולת';
     }
   }
   if (state === 'running') {
     const p = race.racers[0],
       before = p.s,
-      wasRoute = !!p.routeId,
-      oldLap = Math.floor(Math.max(0, p.s) / track.length),
-      drifts = race.drifts;
+      wasRoute = !!p.routeId;
     stepRace(
       race,
       dt,
@@ -910,38 +874,35 @@ function frame(now) {
       routeBend(track, p)
     );
     stepEncounters(race, before, wasRoute);
-    // Rival collisions are physical, with a cooldown so contact cannot trap the player.
     bumpRivals(race);
     syncPickups();
     consumeEvents();
-    if (race.drifts > drifts) {
-      tone(980, 0.2);
-      toast('דריפט מושלם. טורבו!');
-    }
-    if (Math.floor(p.s / track.length) > oldLap && !race.done) {
-      toast(oldLap === 1 ? 'הקפה אחרונה. אין בחירות חוזרות!' : 'הקפה שנייה. מתחילים להתחמם.');
+    const lap = Math.floor(Math.max(0, p.s) / track.length);
+    if (lap > lastLap && !race.done) {
+      lastLap = lap;
+      callout(lap === 2 ? 'הקפה אחרונה' : 'הקפה 2', lap === 2 ? 'gold' : '');
       tone(850, 0.25);
     }
     if (race.time > 7) $('raceHint').classList.add('hidden');
     if (race.done) finish();
   }
   if (state === 'results' && race) coastRace(race, dt);
-  if (state !== 'home' && state !== 'paused') updateKarts(dt);
+  if (race && ['countdown', 'running', 'results', 'paused'].includes(state) && state !== 'paused')
+    updateKarts(dt);
   updateEngine();
   if (state !== 'paused') {
     encounters.update(
       race && state !== 'home' ? race.time : elapsed,
       Math.floor(Math.max(0, race?.racers[0].s || 0) / track.length)
     );
-    fx.update(dt, state === 'home' ? null : race);
+    fx.update(dt, state === 'home' || !race ? null : race);
     updateTrails(dt);
     setCamera(false, dt);
-    for (const p of pickups) {
+    for (const p of pickups)
       if (p.type === 'box' || p.type === 'coin') {
         p.mesh.position.y = p.baseY + (reduced ? 0 : Math.sin(elapsed * 2.4 + p.s) * 0.17);
         if (!reduced) p.mesh.rotation.y += dt * (p.type === 'coin' ? 1.7 : 0.55);
       }
-    }
     for (const p of confetti) {
       p.life -= dt;
       p.v.y -= dt * 2;
@@ -953,42 +914,77 @@ function frame(now) {
   if (elapsed > feedbackUntil) $('feedback').classList.add('hidden');
   if (elapsed > toastUntil) $('toast').classList.remove('visible');
   hudClock += dt;
-  if (race && state !== 'home' && hudClock > 0.09) {
+  if (race && ['countdown', 'running'].includes(state) && hudClock > 0.09) {
     updateHUD();
     hudClock = 0;
   }
   renderer.render(scene, camera);
 }
-$('play').onclick = start;
-$('again').onclick = start;
+
+// ——— Wiring ———
+$('play').onclick = play;
+$('again').onclick = afterResults;
 $('homeButton').onclick = goHome;
 $('pause').onclick = pause;
 $('resume').onclick = resume;
+$('restart').onclick = startRace_;
 $('quit').onclick = goHome;
 $('item').onclick = activateItem;
 $('ability').onclick = activateAbility;
+$('camera').onclick = toggleCamera;
+$('nextRace').onclick = nextRace;
+$('talksQuit').onclick = goHome;
+$('newSeason').onclick = () => {
+  gp = null;
+  saveGp();
+  setMode('gp');
+  goHome();
+};
+$('finalHome').onclick = () => {
+  gp = null;
+  saveGp();
+  goHome();
+};
+$('resumeSeason').onclick = () => {
+  mode = 'gp';
+  selected = gp.player;
+  if (gp.talksPending) showTalks();
+  else goToRace(GP.currentLevel(gp), true);
+};
+$('abandonSeason').onclick = () => {
+  gp = null;
+  saveGp();
+  refreshResumeCard();
+};
+for (const b of document.querySelectorAll('.mode')) b.onclick = () => setMode(b.dataset.mode);
 canvas.addEventListener('pointerup', e => {
-  if (e.pointerType !== 'mouse' && compactTouchLayout() && state === 'running' && race?.racers[0].item)
+  if (e.pointerType !== 'mouse' && touchDevice() && state === 'running' && race?.racers[0].item)
     activateItem();
 });
-$('sound').onclick = () => {
-  sound = !sound;
-  save('ck-sound', sound ? 'on' : 'off');
-  $('sound').setAttribute('aria-pressed', String(sound));
-  $('sound').setAttribute('aria-label', sound ? 'כיבוי צליל' : 'הפעלת צליל');
-  tone(600, 0.14);
+$('sound').onclick = () => setSound(!sound);
+$('soundToggle').onchange = e => setSound(e.target.checked);
+$('wideToggle').onchange = e => {
+  if (e.target.checked !== wideCamera) toggleCamera();
+};
+$('steeringSensitivity').value = sensitivity;
+$('sensitivityValue').textContent = Math.round(sensitivity * 100) + '%';
+$('steeringSensitivity').oninput = e => {
+  sensitivity = Number(e.target.value);
+  save('ck-steering', sensitivity);
+  $('sensitivityValue').textContent = Math.round(sensitivity * 100) + '%';
 };
 $('fullscreen').onclick = async () => {
   try {
     if (document.fullscreenElement) await document.exitFullscreen();
-    else await arena.requestFullscreen();
+    else await document.documentElement.requestFullscreen();
   } catch {
     toast('מסך מלא אינו זמין בדפדפן הזה');
   }
 };
 const commandCodes = new Set(['Space', 'Escape', 'KeyP', 'KeyC', 'KeyE']);
 addEventListener('keydown', e => {
-  if ($('info').open || e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+  if ($('info').open || e.target instanceof HTMLInputElement) return;
+  if (state === 'home' && e.code === 'Enter' && document.activeElement === document.body) return play();
   if (
     !['running', 'countdown', 'paused'].includes(state) ||
     (!KEY_ACTIONS[e.code] && !commandCodes.has(e.code))
@@ -1004,10 +1000,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Space') activateItem();
   if (e.code === 'KeyE') activateAbility();
   if (e.code === 'KeyC') toggleCamera();
-  if (e.code === 'Escape' || e.code === 'KeyP') {
-    if (state === 'paused') resume();
-    else pause();
-  }
+  if (e.code === 'Escape' || e.code === 'KeyP') state === 'paused' ? resume() : pause();
 });
 addEventListener('keyup', e => {
   heldKeys.delete(e.code);
@@ -1029,51 +1022,56 @@ for (const button of document.querySelectorAll('[data-key]')) {
     syncControls();
     button.classList.remove('active');
   };
-  button.onpointerup = up;
-  button.onpointercancel = up;
-  button.onlostpointercapture = up;
+  button.onpointerup = button.onpointercancel = button.onlostpointercapture = up;
 }
 addEventListener('blur', () => {
   clearControls();
   pause();
 });
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) pause();
-});
+document.addEventListener('visibilitychange', () => document.hidden && pause());
 canvas.addEventListener('webglcontextlost', e => {
   e.preventDefault();
   pause();
   $('error').classList.remove('hidden');
 });
-const mobileHelp =
-  '<h2>איך נוהגים במגע?</h2><p>שלוש הקפות מול חמישה נהגים. מי שחוצה ראשון מנצח.</p><ol><li><b>גז והיגוי:</b> הקארט מאיץ לבד. החזיקו גז לעוד קצת מהירות, והקישו עליו כשהספירה מגיעה ל־1 לזינוק טורבו. החזיקו את החצים בצד שמאל כדי לפנות; בלם מאט.</li><li><b>דריפט:</b> החזיקו דריפט וחץ יחד. כשהמד מתמלא, שחררו את דריפט לטורבו. ככל שהצבע מתקדם מכחול לכתום ולסגול, הבוסט חזק יותר. הקשה חדשה על דריפט באוויר נותנת תרגיל ובוסט בנחיתה.</li><li><b>כוח:</b> אספו קופסת קמפיין צהובה. כשהכוח מוכן, הכרטיס יאיר. געו במקום פנוי במסלול או בכרטיס כדי להפעיל אותו. הכוח יכול לתת טורבו, חסינות, סקר מעופף או מגנט פתקים.</li><li><b>מסלול:</b> פתקים מוסיפים מהירות, משטחים בצבע טורקיז נותנים בוסט, ובמסלול הראשון דרכים סודיות מקצרות את הדרך. הימנעו מכדורי ספין וממחסומים.</li></ol><p>אפשר להשהות בכפתור Ⅱ. התוצאות והשיאים נשמרים רק במכשיר הזה.</p>';
 let infoFocus;
 function info(content) {
   pause();
   infoFocus = document.activeElement;
-  if (compactTouchLayout() && content.startsWith('<h2>איך תופסים')) content = mobileHelp;
   $('infoContent').innerHTML = content;
   $('info').showModal();
 }
-$('help').onclick = () =>
-  info(
-    '<h2>איך תופסים את הכיסא?</h2><p>שלוש הקפות במסלול שתבחרו, מול חמישה נהגים ממוחשבים. מי שחוצה ראשון — מנצח. כולם מתחילים עם אותם נתוני בסיס.</p><ol><li><b>נהיגה:</b> לחצו W / ↑ או גז כשהספירה מגיעה ל־1 לזינוק טורבו. גז אוטומטי, עם תוספת האצה ב־W או ↑. היגוי חלק עם A/D או ← →, גם כשהמקלדת בעברית. S או ↓ לבלימה. שחרור הכיוון מייצב את ההגה. אפשר לכוון רגישות בתפריט ההשהיה ולשנות מצלמה עם C.</li><li><b>דריפט:</b> החזיקו Shift יחד עם כיוון. אחרי שהמד נהיה כחול, שחררו לטורבו. כתום נותן סופר טורבו וסגול נותן אולטרה טורבו. לחיצה חדשה על Shift באוויר נותנת תרגיל ובוסט בנחיתה. בנייד משתמשים בכפתור דריפט יחד עם חץ.</li><li><b>אביזרים:</b> אספו קופסה צהובה. לחצו רווח או על האביזר להפעלת טורבו, חסינות לשש שניות או סקר שעף אל היריב הקרוב לפניכם, או מגנט שאוסף פתקים מרחוק למשך שבע שניות. גם היריבים משתמשים באביזרים.</li><li><b>פתקים:</b> כל פתק מוסיף קצת למהירות המרבית, עד עשרה. חפשו את משטחי הטורבו בצבע טורקיז בצד הפנימי של הפניות.</li><li><b>דרכים סודיות:</b> חפשו שער עם סימן שאלה ואבנים צבעוניות בצד הפנימי של הפנייה. היכנסו במהירות מהשוליים: המעבר צר, אבל מקצר את הדרך. SHIFT באוויר מעל רמפה נותן תרגיל ובוסט בנחיתה. נסיעה צמודה מאחורי יריב טוענת סליפסטרים.</li><li><b>הפתעות ומכות:</b> כדורי ספין ענקיים חוצים את הכביש. התחמקות קרובה נותנת טורבו; שערי הזהב מחליפים צד בכל הקפה ומעניקים שלושה פתקים ובוסט. פגיעה ביריב בזמן טורבו מסחררת אותו — חסינות מגינה ממכה אחת.</li><li><b>אל תירדמו:</b> דשא מאט, מחסומים מסחררים, ויריבים יכולים לדחוף. רמות 200cc ו־250cc דורשות בוסטים ונהיגה מדויקת.</li></ol><p>Esc / P להשהיה. מעבר לחלון אחר משהה אוטומטית. תוצאות ושיאים נשמרים רק במכשיר הזה.</p>'
-  );
-$('credits').onclick = () =>
-  info(
-    '<h2>פוליטיקה על גלגלים.</h2><p>משחק סאטירי עצמאי, ללא שיוך מפלגתי. הנהגים הם קריקטורות של דמויות ציבוריות. רכבים, יתרונות, אביזרים ותוצאות הם המצאה לצורך המשחק, ולא סקרים או תחזית בחירות. בחירת הנהגים היא מבחר למשחק, לא רשימת מועמדים מלאה.</p><p>סמלי יש עתיד, הדמוקרטים וישראל ביתנו הורדו מאתרי המפלגות; סמלי הליכוד, ש״ס ועוצמה יהודית מתמונות הסמל בוויקיפדיה. הסמלים שייכים לבעליהם ואינם מעידים על חסות.</p><ul><li><a href="https://www.likud.org.il/" target="_blank" rel="noopener noreferrer">הליכוד</a></li><li><a href="https://yeshatid.org.il/" target="_blank" rel="noopener noreferrer">יש עתיד</a></li><li><a href="https://democrats.org.il/yair-golan/" target="_blank" rel="noopener noreferrer">הדמוקרטים</a></li><li><a href="https://beytenu.org.il/" target="_blank" rel="noopener noreferrer">ישראל ביתנו</a></li><li><a href="https://en.wikipedia.org/wiki/Shas" target="_blank" rel="noopener noreferrer">ש״ס וסמל המפלגה</a></li><li><a href="https://en.wikipedia.org/wiki/Otzma_Yehudit" target="_blank" rel="noopener noreferrer">עוצמה יהודית וסמל המפלגה</a></li></ul><p>העולם והקארטים נבנו בגאומטריה תלת־ממדית מקורית על בסיס הסגנון של משחק האוטובוס הקודם. Three.js ברישיון MIT. אין שימוש בנכסי Nintendo.</p>'
-  );
+$('help').onclick = () => info(helpHTML(touchDevice()));
+$('credits').onclick = () => info(CREDITS_HTML);
 $('closeInfo').onclick = () => $('info').close();
 $('info').addEventListener('close', () => infoFocus?.focus());
-renderLevels();
-choose(selected);
+
+// ——— Boot ———
+renderDrivers(kartImages, selected, choose);
+renderGarage(selected);
+renderTracks(level.id, pickTrack);
+$('driverFace').src = faceImages[selected];
+$('sound').setAttribute('aria-pressed', String(sound));
+$('soundToggle').checked = sound;
+$('wideToggle').checked = wideCamera;
+setMode(mode);
+refreshResumeCard();
+document.title = `${level.name} — קואליציה קארט`;
 setCamera(true);
 $('loading').classList.add('hidden');
 $('play').disabled = false;
 requestAnimationFrame(frame);
+if (params.get('go') === '1') {
+  // Arrived from a menu or between Grand Prix races: drop straight onto the grid.
+  history.replaceState(null, '', location.pathname + '?level=' + level.id + (mode === 'gp' ? '&gp=1' : ''));
+  if (mode === 'gp' && gp?.talksPending) showTalks();
+  else startRace_();
+}
+
 // Read-only state for browser QA and assistive tooling. No remote data or score writes.
 window.readKartState = () => ({
   state,
+  mode,
   countdown: state === 'countdown' ? count : null,
   selected: PARTIES[selected].id,
   level: level.id,
@@ -1083,6 +1081,7 @@ window.readKartState = () => ({
   wideCamera,
   controls: { ...controls },
   renderCalls: renderer.info.render.calls,
+  gp: gp ? { round: gp.round, seats: [...gp.seats], coalition: [...gp.coalition], done: gp.done } : null,
   race: race
     ? {
         time: race.time,
@@ -1094,7 +1093,19 @@ window.readKartState = () => ({
         shortcuts: race.shortcuts,
         events: race.events.slice(-12),
         rank: ranking(race).indexOf(race.racers[0]) + 1,
-        racers: race.racers.map(r => ({ ...r }))
+        racers: race.racers.map(({ brain, stats, ...r }) => ({ ...r }))
       }
     : null
 });
+// QA hooks, only with ?qa=1: jump to Grand Prix screens without racing three times.
+if (params.get('qa') === '1')
+  window.__ck = {
+    setGp(next) {
+      gp = next;
+      mode = 'gp';
+      saveGp();
+    },
+    showTalks,
+    showFinal,
+    goHome
+  };

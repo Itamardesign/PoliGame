@@ -1,28 +1,307 @@
 <!doctype html>
-<html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#edf0df"><title>קואליציה קארט — המרוץ לכיסא</title><meta name="description" content="שישה פוליטיקאים. שלוש הקפות. כיסא אחד. משחק קארטינג בחירות סאטירי בתלת־ממד."><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2325342c'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='44' fill='%23e6fe76'%3E61%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="./kart.css"></head>
-<body><header class="topbar"><a href="./" class="brand"><span class="brand-icon">61<span>↗</span></span><span>קואליציה<span>קארט.</span></span></a><div class="top-caption">המרוץ הכי פחות ממלכתי בישראל</div><nav><button id="help" title="איך משחקים">איך משחקים <span>↗</span></button><button id="sound" class="round" aria-label="הפעלת צליל" aria-pressed="false">♪</button><button id="fullscreen" class="round" aria-label="מסך מלא">⛶</button></nav></header>
-<main><div class="section-line"><span><i></i> COALITION KART / GRAND PRIX</span><span>שישה נהגים. שלוש הקפות. כיסא אחד.</span></div>
-<section id="arena" class="arena"><canvas id="game" tabindex="0" aria-label="מסלול מרוץ תלת־ממדי"></canvas><div class="vignette"></div>
-<div id="loading" class="loading">מחממים את מנועי הבחירות…</div>
-<div id="home" class="home">
-  <div class="home-kicker"><span class="live-dot"></span> COALITION KART <span>VOL. 01 / 03</span></div>
-  <div class="hero-copy">
-    <div class="eyebrow"><span>✳</span> שישה נהגים. כיסא אחד.</div>
-    <h1>המרוץ<br>לכיסא<span>!</span></h1>
-    <p>כל הקולות על הכביש. בחרו נהג, בחרו מסלול — ותשאירו את כולם מאחור.</p>
-    <div class="level-picker"><div class="picker-heading"><strong>בחרו את הזירה</strong><span>3 מסלולים · 3 דרגות טירוף</span></div><div id="levels" class="level-list" role="group" aria-label="בחירת מסלול"></div></div>
-    <button id="play" class="primary" disabled><span class="play-label">יוצאים למרוץ</span><span class="play-arrow">←</span></button>
-    <div class="micro">שלוש הקפות · חמישה יריבים · רק אחד על הפודיום</div>
-  </div>
-  <div class="track-tag"><span class="tag-dot"></span><span id="currentTrackName">גביע הכנסת</span><b id="currentTrackEnglish">JERUSALEM GRAND PRIX</b></div>
-  <div class="ride-caption"><span id="rideName">ביבי־בולט</span><small id="rideTag"></small></div>
-  <div class="select-garage"><div class="garage-heading"><b>01 / בחרו נהג</b><span>החליקו לראות את כולם ←</span></div><div id="drivers" class="drivers" role="group" aria-label="בחירת נהג"></div></div>
-</div>
-<div id="hud" class="hud hidden"><div class="position"><small>מיקום</small><b id="position">6<span>/6</span></b><span id="lap">הקפה 1 / 3</span></div><div class="race-top"><div><small>גביע הכנסת</small><strong id="clock">00:00.00</strong></div><button id="pause" aria-label="השהה מרוץ">Ⅱ</button></div><div class="sector-badge" id="sectorName">שדרות הכנסת</div><div class="lap-progress"><i id="lapProgress"></i></div><button id="camera" class="camera-toggle" aria-label="החלפת מצלמה">מצלמה <kbd>C</kbd></button><div class="leaderboard" id="leaderboard"></div><div class="map-wrap"><canvas id="minimap" width="240" height="180" aria-label="מפת המסלול ומיקומי הנהגים"></canvas><span>הדרך לכנסת</span></div><div class="speedometer"><b id="speed">0</b><span>קמ״ש</span><div class="speed-track"><i id="speedFill"></i></div><small id="coins">0 / 10 פתקים</small></div><button id="item" class="item-slot" aria-label="הפעל אביזר"><span id="itemIcon">?</span><b id="itemName">אספו קופסת קמפיין</b><small>רווח / הקשה</small></button><button id="ability" class="driver-bubble" type="button" aria-label="יכולת מיוחדת"><img id="driverFace" alt=""><b id="driverNick"></b><span id="effectStatus"></span><small id="abilityName" class="ability-name"></small></button><div class="drift-meter"><span id="driftLabel">SHIFT + פנייה = דריפט</span><div><i id="driftFill"></i></div></div><div id="leakOverlay" class="leak-overlay" aria-hidden="true"><p>הדלפה בלעדית</p><p>מסמכים חסויים נחשפים</p><p>גורם בכיר: "זה לא אני"</p></div><div id="raceHint" class="race-hint">W / ↑ האצה · A D / ← → היגוי · S / ↓ בלם · SHIFT דריפט · רווח אביזר</div></div>
-<div id="feedback" class="race-feedback hidden" role="status"></div><div id="countdown" class="countdown hidden" aria-live="assertive"></div><div id="toast" class="toast" role="status"></div><div id="touch" class="touch hidden" role="group" aria-label="פקדי נהיגה במגע"><div class="touch-steer"><button data-key="left" aria-label="פנה שמאלה">←</button><button data-key="right" aria-label="פנה ימינה">→</button></div><div class="touch-actions"><button data-key="brake" class="touch-brake" aria-label="בלם">בלם</button><button data-key="accelerate" class="touch-gas" aria-label="גז">גז</button><button data-key="drift" class="touch-drift" aria-label="דריפט">דריפט</button></div></div>
-<div id="pauseScreen" class="overlay hidden"><div class="modal"><div class="eyebrow">פגרת הכנסת</div><h2>רגע, הפסקת קפה.</h2><p>המנועים מחכים. וגם האופוזיציה.</p><div class="steering-settings"><label for="steeringSensitivity">רגישות היגוי <output id="sensitivityValue">100%</output></label><input id="steeringSensitivity" type="range" min="0.65" max="1.35" step="0.05" value="1"><small>נמוכה = תיקונים עדינים · גבוהה = פניות מהירות</small></div><button id="resume" class="primary">חוזרים למסלול ←</button><button id="quit" class="secondary">חזרה לבחירת נהג</button></div></div>
-<div id="results" class="overlay hidden"><div class="modal results-card"><div class="results-summary"><span class="eyebrow">הקלפיות נסגרו · התוצאות הגיעו</span><div id="resultMedal" class="medal">1</div><h2 id="resultTitle"></h2><p id="resultJoke"></p><div class="result-stats"><div><b id="resultTime"></b><small>זמן מרוץ</small></div><div><b id="resultDrifts"></b><small>בוסטים מדריפט</small></div><div><b id="resultSecrets"></b><small>דרכים סודיות</small></div><div><b id="resultBest"></b><small>השיא שלך במסלול הזה</small></div></div></div><div class="results-standings"><h3 class="results-heading">דירוג המרוץ <span>6 נהגים · 3 הקפות</span></h3><ol id="resultsBoard" class="results-board" aria-label="דירוג נהגים" tabindex="0"></ol></div><div class="results-actions"><button id="again" class="primary">עוד מערכת בחירות ↻</button><button id="homeButton" class="secondary">מחליפים נהג</button></div></div></div>
-<div id="error" class="overlay hidden"><div class="modal"><h2>המנוע לא התניע.</h2><p>נדרשת תמיכת WebGL. נסו דפדפן עם האצת חומרה פעילה.</p><button class="primary" onclick="location.reload()">נסו שוב</button></div></div><div class="arena-bottom"><span>COALITION KART™</span><span>100% סאטירה. 0% הבטחות בחירות.</span></div></section>
-<section class="instructions"><div class="instruction-title">פוליטיקה מלוכלכת.<br><b>דריפט נקי.</b></div><div><span class="keycap">← →</span><p><b>תפסו את הפנייה</b><small class="desktop-guide">WASD או חצים · C לשינוי מצלמה</small><small class="touch-guide">החזיקו חץ כדי לפנות. גז אוטומטי; כפתור גז נותן עוד מהירות.</small></p></div><div><span class="keycap">SHIFT</span><p><b>תחליקו. תטענו. תטוסו.</b><small class="desktop-guide">החזיקו בפנייה ושחררו לטורבו.</small><small class="touch-guide">החזיקו דריפט וחץ; שחררו את דריפט לטורבו.</small></p></div><div><span class="keycap">SPACE</span><p><b>שלפו ספין מנצח</b><small class="desktop-guide">קופסאות קמפיין = הפתעות בדרך.</small><small class="touch-guide">אספו קופסה, ואז געו במסלול כדי להשתמש בכוח.</small></p></div></section>
-<footer><span>משחק סאטירי עצמאי. הדמויות והרכבים הם קריקטורות; התוצאות בדיוניות.</span><button id="credits">מקורות וסמלי המפלגות ↗</button><a href="./classic.html">משחק האוטובוס המקורי ↗</a></footer></main>
-<dialog id="info"><button id="closeInfo" class="close" aria-label="סגירה">×</button><div id="infoContent"></div></dialog><script type="module" src="./kart.js"></script></body></html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1422" />
+    <title>קואליציה קארט</title>
+    <meta
+      name="description"
+      content="מרוץ קארטינג סאטירי בתלת־ממד: שישה מנהיגים, שלושה מסלולים, 120 מנדטים — ומי שמרכיב 61 מקים ממשלה."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1422'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-family='Arial' font-weight='900' font-size='34' fill='%23f2c14e'%3E61%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./fonts.css" />
+    <link rel="stylesheet" href="./kart.css" />
+  </head>
+  <body>
+    <main id="arena" class="arena">
+      <canvas id="game" tabindex="0" aria-label="מסלול המרוץ"></canvas>
+      <div class="vignette" aria-hidden="true"></div>
+      <div id="loading" class="loading" role="status">
+        <span class="loading-mark">61</span>
+        <span>טוענים את המסלול…</span>
+      </div>
+
+      <!-- Title screen -->
+      <section id="home" class="home" aria-label="מסך פתיחה">
+        <header class="home-bar">
+          <div class="wordmark" aria-label="קואליציה קארט">
+            <span class="wordmark-seal">61</span>
+            <span class="wordmark-name">קואליציה<b>קארט</b></span>
+          </div>
+          <div class="home-tools">
+            <button id="help" class="icon-button" aria-label="איך משחקים" title="איך משחקים">?</button>
+            <button id="sound" class="icon-button" aria-label="הפעלת צליל" aria-pressed="false" title="צליל">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 9h4l5-4v14l-5-4H4z" />
+                <path class="wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
+              </svg>
+            </button>
+            <button id="fullscreen" class="icon-button" aria-label="מסך מלא" title="מסך מלא">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="home-panel">
+          <div id="resumeCard" class="resume-card hidden">
+            <div>
+              <small>המרוץ ל־61 בעיצומו</small>
+              <b id="resumeTitle"></b>
+            </div>
+            <button id="resumeSeason" class="primary small">המשך</button>
+            <button id="abandonSeason" class="text-button">עונה חדשה</button>
+          </div>
+
+          <div class="mode-list" role="radiogroup" aria-label="מצב משחק">
+            <button class="mode" data-mode="gp" role="radio" aria-checked="true">
+              <span class="mode-index">01</span>
+              <span class="mode-copy">
+                <b>המרוץ ל־61</b>
+                <small>שלושה מרוצים, 120 מנדטים. בין מרוץ למרוץ מרכיבים קואליציה.</small>
+              </span>
+            </button>
+            <button class="mode" data-mode="single" role="radio" aria-checked="false">
+              <span class="mode-index">02</span>
+              <span class="mode-copy">
+                <b>מרוץ בודד</b>
+                <small>מסלול אחד, שלוש הקפות, שישה נהגים.</small>
+              </span>
+            </button>
+          </div>
+
+          <div id="trackPicker" class="track-picker hidden" role="radiogroup" aria-label="בחירת מסלול"></div>
+
+          <button id="play" class="primary play" disabled>
+            <span id="playLabel">לזינוק</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+          </button>
+        </div>
+
+        <aside class="garage" aria-label="בחירת נהג">
+          <div class="garage-card">
+            <div class="garage-head">
+              <img id="garageLogo" class="garage-logo" alt="" />
+              <div>
+                <h2 id="garageLeader"></h2>
+                <p id="garageRide"></p>
+              </div>
+            </div>
+            <dl id="garageStats" class="stat-bars"></dl>
+            <div class="garage-ability">
+              <small>יכולת מיוחדת</small>
+              <b id="garageAbility"></b>
+              <span id="garageAbilityHint"></span>
+            </div>
+          </div>
+          <div id="drivers" class="drivers" role="radiogroup" aria-label="נהגים"></div>
+        </aside>
+        <footer class="home-foot">
+          <button id="credits" class="text-button">מקורות וזכויות</button>
+          <span>משחק סאטירי עצמאי. הדמויות הן קריקטורות והתוצאות בדיוניות.</span>
+          <a href="./classic.html" class="text-button">משחק האוטובוס המקורי</a>
+        </footer>
+      </section>
+
+      <!-- Race HUD -->
+      <section id="hud" class="hud hidden" aria-label="נתוני מרוץ">
+        <div class="hud-standing">
+          <div class="hud-position"><b id="position">6</b><span>/6</span></div>
+          <div id="lap" class="hud-lap">הקפה 1/3</div>
+          <ol id="leaderboard" class="hud-board" aria-label="דירוג חי"></ol>
+        </div>
+
+        <div class="hud-top">
+          <span id="sectorName" class="hud-sector"></span>
+          <strong id="clock" class="hud-clock">0:00.00</strong>
+          <span id="coalitionMeter" class="hud-coalition hidden"></span>
+        </div>
+
+        <div class="hud-map">
+          <canvas id="minimap" width="240" height="180" aria-label="מפת המסלול"></canvas>
+          <div class="hud-map-tools">
+            <button id="pause" class="icon-button" aria-label="השהיה" title="השהיה (Esc)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" /></svg>
+            </button>
+            <button id="camera" class="icon-button" aria-label="החלפת מצלמה" title="מצלמה (C)">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+                <circle cx="12" cy="13" r="3.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="hud-kit">
+          <button id="item" class="item-slot" aria-label="אין אביזר">
+            <span id="itemIcon" class="item-icon" aria-hidden="true"></span>
+            <span class="kit-copy">
+              <b id="itemName">ריק</b>
+              <small class="key-hint">רווח</small>
+            </span>
+          </button>
+          <button id="ability" class="ability" type="button" aria-label="יכולת מיוחדת">
+            <img id="driverFace" alt="" />
+            <span class="kit-copy">
+              <b id="abilityName"></b>
+              <small class="key-hint">E</small>
+            </span>
+          </button>
+        </div>
+
+        <div class="hud-drive">
+          <div class="drift-meter" aria-hidden="true"><i id="driftFill"></i></div>
+          <span id="driftLabel" class="drift-label"></span>
+          <span id="coins" class="hud-coins"></span>
+          <span id="effectStatus" class="hud-status"></span>
+        </div>
+
+        <div class="ticker" aria-live="polite">
+          <span class="ticker-tag">מבזק</span>
+          <span id="ticker" class="ticker-text"></span>
+        </div>
+        <div id="leakOverlay" class="leak-overlay" aria-hidden="true">
+          <p>הדלפה בלעדית</p>
+          <p>מסמכים חסויים נחשפים</p>
+          <p>גורם בכיר: "זה לא אני"</p>
+        </div>
+        <div id="raceHint" class="race-hint"></div>
+      </section>
+
+      <div id="feedback" class="callout hidden" role="status"></div>
+      <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
+      <div id="toast" class="toast" role="status"></div>
+
+      <div id="touch" class="touch hidden" role="group" aria-label="פקדי נהיגה">
+        <div class="touch-steer">
+          <button data-key="left" aria-label="שמאלה">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+          </button>
+          <button data-key="right" aria-label="ימינה">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+          </button>
+        </div>
+        <div class="touch-actions">
+          <button data-key="brake" class="touch-brake" aria-label="בלם">בלם</button>
+          <button data-key="drift" class="touch-drift" aria-label="דריפט">דריפט</button>
+          <button data-key="accelerate" class="touch-gas" aria-label="גז">גז</button>
+        </div>
+      </div>
+
+      <!-- Pause -->
+      <section id="pauseScreen" class="overlay hidden" aria-label="השהיה">
+        <div class="sheet narrow">
+          <h2>השהיה</h2>
+          <div class="settings">
+            <label for="steeringSensitivity">
+              <span>רגישות היגוי</span>
+              <output id="sensitivityValue">100%</output>
+            </label>
+            <input id="steeringSensitivity" type="range" min="0.65" max="1.35" step="0.05" value="1" />
+            <label class="toggle"><span>מצלמה רחבה</span><input id="wideToggle" type="checkbox" /></label>
+            <label class="toggle"><span>צליל</span><input id="soundToggle" type="checkbox" /></label>
+          </div>
+          <div class="actions">
+            <button id="resume" class="primary">חזרה למרוץ</button>
+            <button id="restart" class="secondary">התחלה מחדש</button>
+            <button id="quit" class="secondary">יציאה לתפריט</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Race results -->
+      <section id="results" class="overlay hidden" aria-label="תוצאות">
+        <div class="sheet results">
+          <header class="results-head">
+            <span id="resultKicker" class="kicker">תוצאות</span>
+            <h2 id="resultTitle"></h2>
+            <p id="resultLine"></p>
+          </header>
+          <ol id="resultsBoard" class="results-board" aria-label="דירוג"></ol>
+          <div id="resultSeats" class="seat-panel hidden"></div>
+          <dl class="result-stats">
+            <div>
+              <dt>זמן</dt>
+              <dd id="resultTime"></dd>
+            </div>
+            <div>
+              <dt>בוסטים מדריפט</dt>
+              <dd id="resultDrifts"></dd>
+            </div>
+            <div>
+              <dt>קיצורי דרך</dt>
+              <dd id="resultSecrets"></dd>
+            </div>
+            <div>
+              <dt>שיא במסלול</dt>
+              <dd id="resultBest"></dd>
+            </div>
+          </dl>
+          <div class="actions">
+            <button id="again" class="primary">עוד מרוץ</button>
+            <button id="homeButton" class="secondary">לתפריט</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Coalition talks between Grand Prix races -->
+      <section id="talks" class="overlay hidden" aria-label="משא ומתן קואליציוני">
+        <div class="sheet wide talks">
+          <header class="talks-head">
+            <span class="kicker" id="talksKicker"></span>
+            <h2>משא ומתן קואליציוני</h2>
+            <p>
+              עד שני שותפים. מפלגה גדולה מכם ביותר מארבעה מנדטים לא תצטרף כשותפה זוטרה, וכל שותף מביא דרישה.
+            </p>
+          </header>
+          <div class="talks-body">
+            <div class="talks-chamber">
+              <div id="talksChamber" class="chamber"></div>
+              <div id="talksSum" class="chamber-sum"></div>
+              <div id="talksNotice" class="notice hidden"></div>
+            </div>
+            <ul id="offers" class="offers"></ul>
+          </div>
+          <div class="actions">
+            <button id="nextRace" class="primary">למרוץ הבא</button>
+            <button id="talksQuit" class="secondary">לתפריט</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Final count -->
+      <section id="final" class="overlay hidden" aria-label="ספירת המנדטים">
+        <div class="sheet wide final">
+          <span class="kicker">ספירת המנדטים</span>
+          <h2 id="finalTitle"></h2>
+          <p id="finalLine"></p>
+          <div id="finalChamber" class="chamber large"></div>
+          <ul id="finalParties" class="final-parties"></ul>
+          <div class="actions">
+            <button id="newSeason" class="primary">עונה חדשה</button>
+            <button id="finalHome" class="secondary">לתפריט</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="error" class="overlay hidden" aria-label="שגיאה">
+        <div class="sheet narrow">
+          <h2>המנוע לא התניע.</h2>
+          <p>נדרשת תמיכת WebGL. נסו דפדפן עם האצת חומרה פעילה.</p>
+          <div class="actions"><button class="primary" onclick="location.reload()">נסו שוב</button></div>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="info">
+      <button id="closeInfo" class="icon-button close" aria-label="סגירה">×</button>
+      <div id="infoContent"></div>
+    </dialog>
+    <script type="module" src="./kart.js"></script>
+  </body>
+</html>
