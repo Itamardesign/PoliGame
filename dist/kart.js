@@ -33,6 +33,7 @@ import { KEY_ACTIONS, readControls } from './kart-input.js';
 import { LEVELS, levelById } from './kart-levels.js';
 import { makeRecorder, sampleGhost, loadGhost } from './ghost.js';
 import { makeHud, formatTime } from './kart-hud.js';
+import { makeAudio } from './kart-audio.js';
 import { MOODS } from './world-set.js';
 import * as GP from './gp.js';
 import {
@@ -145,7 +146,6 @@ let selected = clamp(Number(stored('ck-driver', '0')) || 0, 0, PARTIES.length - 
   toastUntil = 0,
   feedbackUntil = 0,
   sound = stored('ck-sound', 'off') === 'on',
-  audio,
   previousRank = 6,
   confetti = [],
   seenEvent = 0,
@@ -173,49 +173,17 @@ const heldKeys = new Set(),
 const controls = readControls(heldKeys, touchKeys);
 const syncControls = () => Object.assign(controls, readControls(heldKeys, touchKeys));
 
-// Audio: short synthesized cues and an engine note that follows speed.
-let engineOsc, engineGain, engineFilter;
-function tone(freq = 500, duration = 0.12, type = 'triangle', volume = 0.045) {
-  if (!sound) return;
-  try {
-    audio ??= new AudioContext();
-    if (audio.state === 'suspended') audio.resume();
-    const o = audio.createOscillator(),
-      g = audio.createGain();
-    o.type = type;
-    o.frequency.setValueAtTime(freq, audio.currentTime);
-    o.frequency.exponentialRampToValueAtTime(freq * 0.65, audio.currentTime + duration);
-    g.gain.setValueAtTime(volume, audio.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + duration);
-    o.connect(g);
-    g.connect(audio.destination);
-    o.start();
-    o.stop(audio.currentTime + duration);
-  } catch {}
-}
-function updateEngine() {
-  if (!audio) return;
-  if (!engineOsc) {
-    engineOsc = audio.createOscillator();
-    engineGain = audio.createGain();
-    engineFilter = audio.createBiquadFilter();
-    engineOsc.type = 'sawtooth';
-    engineFilter.type = 'lowpass';
-    engineFilter.frequency.value = 220;
-    engineGain.gain.value = 0;
-    engineOsc.connect(engineFilter);
-    engineFilter.connect(engineGain);
-    engineGain.connect(audio.destination);
-    engineOsc.start();
-  }
-  const active = sound && state === 'running',
-    p = race?.racers[0];
-  engineOsc.frequency.setTargetAtTime(40 + (p?.speed || 0) * 2.5, audio.currentTime, 0.08);
-  engineGain.gain.setTargetAtTime(active ? 0.016 : 0, audio.currentTime, 0.06);
-}
+// Audio: cues, engine, music and the optional announcer all live in kart-audio.js.
+const audio = makeAudio();
+const tone = (...args) => audio.tone(...args);
+let musicOn = stored('ck-music', 'on') === 'on',
+  voiceOn = stored('ck-voice', 'off') === 'on';
+audio.setMusic(musicOn);
+audio.setVoice(voiceOn);
 function setSound(on) {
   sound = on;
   save('ck-sound', on ? 'on' : 'off');
+  audio.setEnabled(on);
   $('sound').setAttribute('aria-pressed', String(on));
   $('sound').setAttribute('aria-label', on ? 'כיבוי צליל' : 'הפעלת צליל');
   $('soundToggle').checked = on;
@@ -1045,7 +1013,10 @@ function updateHUD() {
   } else $('coalitionMeter').style.color = '';
   if (position < previousRank && race.time > 4 && state === 'running') {
     tone(700, 0.07);
-    if (position === 1) callout('מקום ראשון', 'gold');
+    if (position === 1) {
+      callout('מקום ראשון', 'gold');
+      audio.say('מקום ראשון');
+    }
     pulse(position === 1 ? [30, 45, 40] : 24);
   }
   previousRank = position;
@@ -1130,7 +1101,10 @@ function frame(now) {
           `הקפה ${lap} · ${formatTime(split)}${ref ? ' (' + (split - ref > 0 ? '+' : '−') + Math.abs(split - ref).toFixed(2) + ')' : ''}`,
           ref && split < ref ? 'gold' : ''
         );
-      else if (!race.done) callout(lap === 2 ? 'הקפה אחרונה' : 'הקפה 2', lap === 2 ? 'gold' : '');
+      else if (!race.done) {
+        callout(lap === 2 ? 'הקפה אחרונה' : 'הקפה 2', lap === 2 ? 'gold' : '');
+        if (lap === 2) audio.say('הקפה אחרונה');
+      }
       tone(850, 0.25);
     }
     if (race.time > 7) $('raceHint').classList.add('hidden');
@@ -1139,6 +1113,7 @@ function frame(now) {
       finishT = 0;
       const place = ranking(race).indexOf(race.racers[0]) + 1;
       callout(place === 1 ? 'ניצחון!' : 'סיום · מקום ' + place, place === 1 ? 'gold' : '');
+      audio.say(place === 1 ? 'ניצחון!' : 'סיימתם במקום ' + place);
       arena.classList.add('cinematic');
       $('touch').classList.add('hidden');
       tone(place === 1 ? 1000 : 600, 0.4);
@@ -1161,7 +1136,12 @@ function frame(now) {
   if (state === 'results' && race) coastRace(race, dt);
   if (race && ['intro', 'countdown', 'running', 'finishing', 'results'].includes(state))
     updateKarts(dt * slow);
-  updateEngine();
+  audio.update(dt, {
+    racing: state === 'running' || state === 'countdown',
+    player: race?.racers[0],
+    lastLap: state === 'running' && lastLap >= 2,
+    menu: state === 'home'
+  });
   if (state !== 'paused') {
     encounters.update(
       race && state !== 'home' ? race.time : elapsed,
@@ -1243,6 +1223,17 @@ canvas.addEventListener('pointerup', e => {
 });
 $('sound').onclick = () => setSound(!sound);
 $('soundToggle').onchange = e => setSound(e.target.checked);
+$('musicToggle').onchange = e => {
+  musicOn = e.target.checked;
+  save('ck-music', musicOn ? 'on' : 'off');
+  audio.setMusic(musicOn);
+};
+$('voiceToggle').onchange = e => {
+  voiceOn = e.target.checked;
+  save('ck-voice', voiceOn ? 'on' : 'off');
+  audio.setVoice(voiceOn);
+  if (voiceOn) audio.say('הקריין איתכם');
+};
 $('wideToggle').onchange = e => {
   if (e.target.checked !== wideCamera) toggleCamera();
 };
@@ -1334,6 +1325,9 @@ renderTracks(level.id, pickTrack);
 $('driverFace').src = faceImages[selected];
 $('sound').setAttribute('aria-pressed', String(sound));
 $('soundToggle').checked = sound;
+$('musicToggle').checked = musicOn;
+$('voiceToggle').checked = voiceOn;
+audio.setEnabled(sound);
 $('wideToggle').checked = wideCamera;
 setMode(mode);
 refreshResumeCard();

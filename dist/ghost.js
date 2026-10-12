@@ -20,21 +20,23 @@ export function makeRecorder(routes = []) {
   const frames = [];
   return {
     record(racer, time) {
-      if (time < clock) return;
-      clock = time + 1 / RATE;
-      frames.push([
-        +racer.s.toFixed(2),
-        +racer.x.toFixed(2),
-        +racer.steer.toFixed(2),
-        racer.drifting ? 1 : 0,
-        +racer.air.toFixed(2),
-        +racer.airTotal.toFixed(2),
-        +racer.boost.toFixed(2),
-        racer.routeId ? routes.findIndex(r => r.id === racer.routeId) : -1,
-        +racer.routeDistance.toFixed(2),
-        +racer.speed.toFixed(1),
-        +racer.lateral.toFixed(1)
-      ]);
+      // A fixed 20 Hz schedule: sample k always stands for time k / RATE, even after a slow frame.
+      while (clock <= time) {
+        clock += 1 / RATE;
+        frames.push([
+          +racer.s.toFixed(2),
+          +racer.x.toFixed(2),
+          +racer.steer.toFixed(2),
+          racer.drifting ? 1 : 0,
+          +racer.air.toFixed(2),
+          +racer.airTotal.toFixed(2),
+          +racer.boost.toFixed(2),
+          racer.routeId ? routes.findIndex(r => r.id === racer.routeId) : -1,
+          +racer.routeDistance.toFixed(2),
+          +racer.speed.toFixed(1),
+          +racer.lateral.toFixed(1)
+        ]);
+      }
     },
     finish(time, party, laps = []) {
       return { version: 1, time, party, laps, rate: RATE, frames };
