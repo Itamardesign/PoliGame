@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { ROAD, makeRace, stepRace, ranking, useItem, hitRacer, grantItem } from '../dist/race-model.js';
 import { makeTrack } from '../dist/kart-world.js';
 const track = makeTrack();
+// Physics checks run without rival interference: no pickups and rivals parked far behind.
+function solo() {
+  const race = makeRace(0, 'normal', 6161, 760, [], 'jerusalem', { pickups: false });
+  race.racers.slice(1).forEach((r, i) => (r.s = -1000 - i * 10));
+  return race;
+}
 function simulate(difficulty, drive) {
   const race = makeRace(0, difficulty, 6161, track.length);
   for (let i = 0; i < 20000 && !race.done; i++) {
@@ -36,7 +42,7 @@ test('steering can overcome corners; going idle loses', () => {
   });
 });
 test('drift must charge before release; release grants finite boost', () => {
-  const r = makeRace();
+  const r = solo();
   const p = r.racers[0];
   p.speed = 32;
   for (let i = 0; i < 55; i++) stepRace(r, 1 / 60, { steer: Math.sin(i * 0.3) > 0 ? 1 : -1, drift: true }, 0);
@@ -48,7 +54,7 @@ test('drift must charge before release; release grants finite boost', () => {
   assert.equal(p.boost, 0);
 });
 test('shield absorbs one hazard; collision cooldown prevents repeated hits', () => {
-  const r = makeRace(),
+  const r = solo(),
     p = r.racers[0];
   p.shield = 6;
   assert.equal(hitRacer(p), false);
@@ -83,7 +89,7 @@ test('poll travels before impact and a shield can block it', () => {
   assert.equal(b.stun, 0);
 });
 test('an occupied item slot cannot be overwritten; all racers can use items', () => {
-  const r = makeRace(),
+  const r = solo(),
     p = r.racers[0];
   p.item = 'shield';
   grantItem(r, p);
@@ -108,7 +114,7 @@ test('200cc rivals are faster than 150cc; all parties share player baseline', ()
   assert.ok(b.racers[1].s > a.racers[1].s);
 });
 test('offroad and braking reduce speed, positions stay bounded', () => {
-  const r = makeRace(),
+  const r = solo(),
     p = r.racers[0];
   p.x = 10;
   p.speed = 32;
@@ -121,7 +127,7 @@ test('offroad and braking reduce speed, positions stay bounded', () => {
 });
 
 test('new tarmac width has usable grip beyond the original narrow road', () => {
-  const r = makeRace(),
+  const r = solo(),
     p = r.racers[0];
   p.x = 8.5;
   for (let i = 0; i < 180; i++) stepRace(r, 1 / 60, {});
@@ -131,7 +137,7 @@ test('new tarmac width has usable grip beyond the original narrow road', () => {
   assert.ok(p.speed < 18);
 });
 test('a short steering tap is precise and released steering quickly settles', () => {
-  const r = makeRace(),
+  const r = solo(),
     p = r.racers[0];
   p.x = 0;
   p.speed = 32;
@@ -142,7 +148,7 @@ test('a short steering tap is precise and released steering quickly settles', ()
   assert.ok(p.x < 1.2);
 });
 test('reversing direction responds promptly without oscillation', () => {
-  const r = makeRace(),
+  const r = solo(),
     p = r.racers[0];
   p.x = 0;
   p.speed = 32;
@@ -153,7 +159,7 @@ test('reversing direction responds promptly without oscillation', () => {
 });
 test('steering is consistent at 30, 60 and 120 Hz', () => {
   function drive(hz) {
-    const r = makeRace(),
+    const r = solo(),
       p = r.racers[0];
     p.x = 0;
     p.speed = 32;
@@ -164,7 +170,7 @@ test('steering is consistent at 30, 60 and 120 Hz', () => {
   assert.ok(Math.abs(drive(60) - drive(120)) < 0.12);
 });
 test('manual throttle accelerates and braking takes priority', () => {
-  const r = makeRace(),
+  const r = solo(),
     p = r.racers[0];
   for (let i = 0; i < 240; i++) stepRace(r, 1 / 60, { accelerate: true });
   assert.ok(p.speed > 34.5);
@@ -172,8 +178,8 @@ test('manual throttle accelerates and braking takes priority', () => {
   assert.ok(p.speed < 16);
 });
 test('lower sensitivity supports fine corrections while high sensitivity turns faster', () => {
-  const a = makeRace(),
-    b = makeRace();
+  const a = solo(),
+    b = solo();
   for (let i = 0; i < 40; i++) {
     stepRace(a, 1 / 60, { steer: 1, sensitivity: 0.65 });
     stepRace(b, 1 / 60, { steer: 1, sensitivity: 1.35 });
