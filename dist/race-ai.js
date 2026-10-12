@@ -135,7 +135,6 @@ function chooseLine(race, r, dt) {
     for (const p of race.pickups) {
       if (p.hiddenUntil > race.time) continue;
       if (p.type === 'box' && r.item) continue;
-      if (p.type === 'coin' && r.coins >= 10) continue;
       if (p.type !== 'box' && p.type !== 'coin' && p.type !== 'boost') continue;
       const d = (((p.s - r.s) % race.length) + race.length) % race.length;
       if (d < 3 || d > 32) continue;

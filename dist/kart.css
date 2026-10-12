@@ -1864,3 +1864,34 @@ dialog#info kbd {
     z-index: 2;
   }
 }
+
+/* Ballot meter: ten paper slips; carried ones are bright, slots a partner's cap removed are struck. */
+.ballots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+.ballots .hud-coins {
+  background: none;
+  padding: 0;
+}
+.ballot-slots {
+  display: flex;
+  gap: 3px;
+}
+.ballot-slots i {
+  width: 9px;
+  height: 13px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.16);
+}
+.ballot-slots i.on {
+  background: #f7f5ee;
+  box-shadow: 0 0 6px rgb(255 255 255 / 0.35);
+}
+.ballot-slots i.off {
+  background: repeating-linear-gradient(45deg, rgb(229 56 59 / 0.6) 0 2px, transparent 2px 4px);
+}

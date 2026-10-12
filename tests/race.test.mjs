@@ -203,3 +203,20 @@ test('walls hold a kart in, bounce it back and cost some pace', () => {
   assert.ok(r.events.some(e => e.type === 'wall' && e.player));
   assert.ok(p.speed < 34);
 });
+
+test('ballot slips raise top speed, count as votes, and a spin knocks three loose', () => {
+  const r = makeRace(0, 'normal', 6161, 760, [], 'jerusalem', { pickups: false });
+  r.racers.slice(1).forEach((x, i) => (x.s = -1000 - i * 10));
+  const p = r.racers[0];
+  for (let i = 0; i < 300; i++) stepRace(r, 1 / 60, { accelerate: true });
+  const slow = p.speed;
+  p.coins = 10;
+  for (let i = 0; i < 300; i++) stepRace(r, 1 / 60, { accelerate: true });
+  assert.ok(p.speed > slow + 1.5);
+  p.votes = 12;
+  p.hitCooldown = 0;
+  hitRacer(p, r);
+  assert.equal(p.coins, 7);
+  assert.equal(p.votes, 12);
+  assert.ok(r.events.some(e => e.type === 'ballots-lost' && e.count === 3));
+});

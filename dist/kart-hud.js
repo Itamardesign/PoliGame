@@ -151,7 +151,9 @@ export function makeHud({ arena, track, reduced, touch }) {
     }
   }
 
-  let lastItem = undefined;
+  let lastItem = undefined,
+    lastSlips = -1,
+    lastCap = 10;
   function update(race, { selected, gp, coalitionSeats, now }) {
     const p = race.racers[0],
       order = ranking(race),
@@ -215,7 +217,18 @@ export function makeHud({ arena, track, reduced, touch }) {
         ? 'חזרה לכביש'
         : '';
     const cap = race.handicap.ballotCap ?? 10;
-    $('coins').textContent = `פתקים ${Math.min(p.coins, cap)}/${cap}`;
+    // Ballot meter: ten slots, each carried slip a little more top speed; votes tally beside it.
+    const carried = Math.min(p.coins, cap);
+    if (carried !== lastSlips || cap !== lastCap) {
+      lastSlips = carried;
+      lastCap = cap;
+      $('ballotSlots').innerHTML = Array.from(
+        { length: 10 },
+        (_, i) => `<i class="${i < carried ? 'on' : i >= cap ? 'off' : ''}"></i>`
+      ).join('');
+    }
+    const bonus = Math.round(((carried * (p.stats?.ballot ?? 0.2)) / 35) * 100);
+    $('coins').textContent = `${bonus ? '+' + bonus + '% מהירות · ' : ''}${p.votes} קולות`;
     $('effectStatus').textContent =
       p.confused > 0
         ? 'ההגה הפוך'
@@ -242,5 +255,16 @@ export function makeHud({ arena, track, reduced, touch }) {
     return position;
   }
 
-  return { update, onEvent, tick, resetTicker, pumpTicker, drawMap, reset: () => (lastItem = undefined) };
+  return {
+    update,
+    onEvent,
+    tick,
+    resetTicker,
+    pumpTicker,
+    drawMap,
+    reset: () => {
+      lastItem = undefined;
+      lastSlips = -1;
+    }
+  };
 }

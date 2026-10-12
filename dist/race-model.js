@@ -205,6 +205,7 @@ export function makeRace(
       lastDrift: false,
       item: null,
       coins: 0,
+      votes: 0,
       finish: null,
       projected: null,
       hitCooldown: 0,
@@ -276,8 +277,19 @@ export function hitRacer(racer, race = null, cause = 'hazard') {
   racer.speed *= 0.5;
   racer.charge = 0;
   racer.drifting = false;
-  if (race) emitRace(race, 'hit', racer, { cause });
+  if (race) {
+    emitRace(race, 'hit', racer, { cause });
+    loseBallots(race, racer);
+  }
   return true;
+}
+// A spin shakes loose up to three carried slips: the speed they gave is gone (the votes stay).
+export function loseBallots(race, racer, count = 3) {
+  const lost = Math.min(count, racer.coins);
+  if (!lost) return 0;
+  racer.coins -= lost;
+  emitRace(race, 'ballots-lost', racer, { count: lost });
+  return lost;
 }
 // Rivals' starts vary: the sharper the field, the more of them nail the launch.
 export function startRace(race, playerLaunch = false) {
@@ -300,10 +312,11 @@ function project(race) {
 
 function collect(race, r, p) {
   if (p.type === 'coin') {
-    if (r.coins >= 10 && !r.player) return;
+    // A ballot slip is a vote: it always counts, and up to ten carried raise top speed.
     p.hiddenUntil = race.time + RESPAWN.coin;
     r.coins = Math.min(10, r.coins + 1);
-    emitRace(race, 'pickup', r, { count: r.coins });
+    r.votes++;
+    emitRace(race, 'pickup', r, { count: r.coins, votes: r.votes });
   } else if (p.type === 'box') {
     if (r.item) return;
     p.hiddenUntil = race.time + RESPAWN.box;

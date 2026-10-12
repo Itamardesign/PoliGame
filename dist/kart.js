@@ -694,6 +694,10 @@ function consumeEvents() {
       tone(1200, 0.3);
     }
     if (e.type === 'pickup') tone(900, 0.05);
+    if (e.type === 'ballots-lost') {
+      toast(`איבדתם ${e.count} פתקים`);
+      pulse([15, 30, 15]);
+    }
     if (e.type === 'boost-pad') tone(840, 0.18);
     if (e.type === 'item-get') {
       tone(570, 0.12);
@@ -729,10 +733,12 @@ function finish() {
   const inGp = mode === 'gp' && gp && !gp.done;
   let gained = null;
   if (inGp) {
+    const votes = PARTIES.map((_, id) => race.racers.find(r => r.id === id)?.votes ?? 0);
     gained = GP.awardSeats(
       gp,
       order.map(r => r.id),
-      playerHits
+      playerHits,
+      votes
     );
     gp.talksPending = !gp.done;
     saveGp();

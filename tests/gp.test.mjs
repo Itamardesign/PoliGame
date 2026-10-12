@@ -13,6 +13,8 @@ import {
   currentLevel,
   GP_RACES,
   SEATS_BY_PLACE,
+  SEATS_BY_VOTE,
+  voteSeats,
   MAX_PARTNERS
 } from '../dist/gp.js';
 import { makeRace, stepRace, useItem } from '../dist/race-model.js';
@@ -24,7 +26,7 @@ test('three races hand out exactly the 120 seats of the Knesset', () => {
     gp.seats.reduce((a, b) => a + b),
     120
   );
-  assert.equal(SEATS_BY_PLACE.reduce((a, b) => a + b) * GP_RACES.length, 120);
+  assert.equal((SEATS_BY_PLACE.reduce((a, b) => a + b) + SEATS_BY_VOTE) * GP_RACES.length, 120);
   assert.equal(gp.done, true);
   // Winning every race alone is still not a majority.
   assert.ok(gp.seats[0] < 61);
@@ -98,4 +100,22 @@ test('a saved Grand Prix survives the reload between races', () => {
   assert.deepEqual(back, gp);
   assert.equal(restore('nonsense'), null);
   assert.equal(restore(JSON.stringify({ version: 1 })), null);
+});
+
+test('ballot slips become seats: six per race shared by largest remainder', () => {
+  assert.deepEqual(voteSeats([30, 0, 0, 0, 0, 0]), [6, 0, 0, 0, 0, 0]);
+  assert.deepEqual(voteSeats([10, 10, 10, 10, 10, 10]), [1, 1, 1, 1, 1, 1]);
+  assert.equal(
+    voteSeats([17, 3, 9, 0, 22, 5]).reduce((a, b) => a + b),
+    6
+  );
+  assert.deepEqual(voteSeats([0, 0, 0, 0, 0, 0]), [0, 0, 0, 0, 0, 0]);
+  const gp = newGrandPrix(0);
+  // Last place, but the most votes: votes still pay.
+  const gained = awardSeats(gp, [1, 2, 3, 4, 5, 0], {}, [40, 5, 5, 5, 5, 0]);
+  assert.ok(gained[0] >= SEATS_BY_PLACE[5] + 4);
+  assert.equal(
+    gained.reduce((a, b) => a + b),
+    40
+  );
 });

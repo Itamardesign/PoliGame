@@ -53,7 +53,11 @@ function runRace(party, levelId, seed, options) {
         if (victim !== null && victim !== undefined) hits[victim] = (hits[victim] ?? 0) + 1;
       }
   }
-  return { order: ranking(race).map(r => r.id), hits };
+  return {
+    order: ranking(race).map(r => r.id),
+    hits,
+    votes: [0, 1, 2, 3, 4, 5].map(id => race.racers.find(r => r.id === id).votes)
+  };
 }
 const outcomes = {},
   seatsList = [];
@@ -62,8 +66,8 @@ for (let n = 0; n < seasons; n++) {
     gp = GP.newGrandPrix(party);
   while (!gp.done) {
     const level = GP.currentLevel(gp);
-    const { order, hits } = runRace(party, level, 500 + n * 7 + gp.round, GP.raceOptions(gp));
-    GP.awardSeats(gp, order, hits);
+    const { order, hits, votes } = runRace(party, level, 500 + n * 7 + gp.round, GP.raceOptions(gp));
+    GP.awardSeats(gp, order, hits, votes);
     if (gp.done) break;
     GP.defections(gp);
     const want = strategy === 'solo' ? 0 : strategy === 'lean' ? 1 : 2;

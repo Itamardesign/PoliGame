@@ -5,7 +5,22 @@
 import { PARTIES } from './race-model.js';
 
 export const GP_RACES = ['jerusalem', 'market', 'midnight'];
-export const SEATS_BY_PLACE = [12, 9, 7, 5, 4, 3];
+// Each race is worth 40 seats: 34 by finishing place, and 6 shared out in proportion to the
+// ballot slips each party collected, by largest remainder — the way real seats follow votes.
+export const SEATS_BY_PLACE = [10, 8, 6, 5, 3, 2];
+export const SEATS_BY_VOTE = 6;
+export function voteSeats(votes, seats = SEATS_BY_VOTE) {
+  const total = votes.reduce((a, b) => a + b, 0);
+  if (!total) return votes.map(() => 0);
+  const quota = votes.map(v => (v * seats) / total),
+    out = quota.map(Math.floor);
+  const order = quota
+    .map((q, i) => [q - Math.floor(q), votes[i], i])
+    .sort((a, b) => b[0] - a[0] || b[1] - a[1]);
+  const left = seats - out.reduce((a, b) => a + b, 0);
+  for (let k = 0; k < left; k++) out[order[k][2]]++;
+  return out;
+}
 export const MAJORITY = 61;
 export const MAX_PARTNERS = 2;
 // How many more seats than the player a party may hold and still agree to join.
@@ -51,12 +66,15 @@ export const isFinalRound = gp => gp.round >= GP_RACES.length - 1;
 export const coalitionSeats = gp => [gp.player, ...gp.coalition].reduce((sum, id) => sum + gp.seats[id], 0);
 
 // order: party ids in finishing order. hits: { [partyId]: times the player hit them this race }.
-export function awardSeats(gp, order, hits = {}) {
-  const gained = PARTIES.map(() => 0);
+// votes: ballot slips collected, indexed by party id.
+export function awardSeats(gp, order, hits = {}, votes = null) {
+  const gained = PARTIES.map(() => 0),
+    byVote = voteSeats(votes ?? PARTIES.map(() => 1));
   order.forEach((id, place) => {
-    gained[id] = SEATS_BY_PLACE[place] ?? 0;
+    gained[id] = (SEATS_BY_PLACE[place] ?? 0) + byVote[id];
     gp.seats[id] += gained[id];
   });
+  gp.lastVoteSeats = byVote;
   const mine = order.indexOf(gp.player);
   for (const id of gp.coalition) {
     const place = order.indexOf(id);

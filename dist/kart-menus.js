@@ -122,7 +122,7 @@ export function renderResults({
     .map((r, i) => {
       const p = PARTIES[r.id],
         t = r.finish ?? r.projected;
-      return `<li class="${r.player ? 'me' : ''}" style="--party:${p.color}"><span class="rank">${i + 1}</span><i></i><img src="${images[r.id]}" alt=""><span class="who"><b>${p.leader}${r.player ? ' · אתם' : ''}</b><small>${p.name}${gp && gp.coalition.includes(r.id) ? ' · שותפה' : ''}</small></span><span class="time">${i === 0 ? formatTime(t) : '+' + (t - lead).toFixed(2)}</span>${gp ? `<span class="seats">+${gained[r.id]}</span>` : ''}</li>`;
+      return `<li class="${r.player ? 'me' : ''}" style="--party:${p.color}"><span class="rank">${i + 1}</span><i></i><img src="${images[r.id]}" alt=""><span class="who"><b>${p.leader}${r.player ? ' · אתם' : ''}</b><small>${p.name} · ${r.votes} קולות${gp && gp.coalition.includes(r.id) ? ' · שותפה' : ''}</small></span><span class="time">${i === 0 ? formatTime(t) : '+' + (t - lead).toFixed(2)}</span>${gp ? `<span class="seats">+${gained[r.id]}</span>` : ''}</li>`;
     })
     .join('');
   $('resultTime').textContent = formatTime(me.finish);

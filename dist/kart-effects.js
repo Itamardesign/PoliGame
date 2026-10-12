@@ -210,6 +210,10 @@ export function makeEffects(scene, track, karts, reduced) {
       ring(p.clone().setY(p.y + 0.6), '#ffffff');
       if (r.player && !reduced) shake = Math.max(shake, 0.2);
     }
+    if (e.type === 'ballots-lost') {
+      // The slips fly out of the kart as loose paper.
+      burst(p.clone().add(new T.Vector3(0, 0.6, 0)), '#f7f5ee', 10 + e.count * 4);
+    }
     if (e.type === 'wall') {
       burst(p.clone().add(new T.Vector3(0, -0.6, 0)), '#ffd28a', 14);
       if (r.player && !reduced) shake = Math.max(shake, 0.12);

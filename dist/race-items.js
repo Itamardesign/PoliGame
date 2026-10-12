@@ -1,5 +1,5 @@
 // Campaign items, leader abilities and vehicle stats. Pure simulation: no rendering here.
-import { emitRace, ranking, hitRacer, clamp, allied } from './race-model.js';
+import { emitRace, ranking, hitRacer, clamp, allied, loseBallots } from './race-model.js';
 
 export const ITEMS = {
   boost: { name: 'טורבו הבטחות', short: 'טורבו', glyph: '↯' },
@@ -148,6 +148,7 @@ export function stepProjectiles(race, dt) {
     target.drifting = false;
     if (p.kind === 'noconf') target.speed *= 0.3;
     emitRace(race, 'hit', target, { from: p.from, cause: p.kind });
+    loseBallots(race, target);
     if (p.kind === 'noconf')
       for (const r of race.racers)
         if (r !== target && r.finish === null && Math.abs(r.s - target.s) < 7 && Math.abs(r.x - target.x) < 5)
