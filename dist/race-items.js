@@ -25,6 +25,11 @@ const TABLE = [
 
 export function grantItem(race, racer) {
   if (racer.item) return;
+  // Time trials keep it clean: every box is a turbo.
+  if (race.trial) {
+    racer.item = 'boost';
+    return void emitRace(race, 'item-get', racer, { item: 'boost' });
+  }
   const rank = clamp(ranking(race).indexOf(racer), 0, TABLE.length - 1),
     weights = Object.entries(TABLE[rank]),
     total = weights.reduce((s, [, w]) => s + w, 0);

@@ -76,20 +76,47 @@ export function blocsFor(gp, highlight = true) {
   }));
 }
 
-export function renderResults({ race, order, images, place, best, level, gp, gained }) {
+export function renderResults({
+  race,
+  order,
+  images,
+  place,
+  best,
+  level,
+  gp,
+  gained,
+  mode,
+  newRecord,
+  previous,
+  daily
+}) {
   const me = race.racers[0];
   const titles = gp
     ? ['ניצחון במרוץ', 'מקום שני', 'מקום שלישי', 'מקום רביעי', 'מקום חמישי', 'מקום שישי']
     : ['ניצחתם', 'מקום שני', 'מקום שלישי', 'מקום רביעי', 'מקום חמישי', 'מקום אחרון'];
   $('resultKicker').textContent = gp
     ? `המרוץ ל־61 · מרוץ ${gp.history.length} מתוך ${GP.GP_RACES.length} · ${level.name}`
-    : `${level.name} · ${level.speed}`;
-  $('resultTitle').textContent = titles[place - 1];
-  $('resultLine').textContent = gp
-    ? `${gained[me.id]} מנדטים במרוץ הזה. לקואליציה שלכם יש עכשיו ${GP.coalitionSeats(gp)} מתוך 61 הדרושים.`
-    : place === 1
-      ? `${formatTime(me.finish)} — ${((order[1].finish ?? order[1].projected) - me.finish).toFixed(2)} שניות לפני ${PARTIES[order[1].id].short}.`
-      : `${(me.finish - (order[0].finish ?? order[0].projected)).toFixed(2)} שניות אחרי ${PARTIES[order[0].id].short}.`;
+    : mode === 'trial'
+      ? `נגד השעון · ${level.name}`
+      : mode === 'daily'
+        ? `אתגר יומי · ${daily.label} · ${level.name}`
+        : `${level.name} · ${level.speed}`;
+  $('resultTitle').textContent =
+    mode === 'trial' ? (newRecord ? 'שיא חדש' : formatTime(me.finish)) : titles[place - 1];
+  let line;
+  if (gp)
+    line = `${gained[me.id]} מנדטים במרוץ הזה. לקואליציה שלכם יש עכשיו ${GP.coalitionSeats(gp)} מתוך 61 הדרושים.`;
+  else if (mode === 'trial')
+    line = newRecord
+      ? previous
+        ? `${formatTime(me.finish)} — ${(previous - me.finish).toFixed(2)} שניות מהר מהשיא הקודם. הרוח החדשה נשמרה.`
+        : `${formatTime(me.finish)}. הרוח שלכם נשמרה — בפעם הבאה תתחרו בה.`
+      : `${(me.finish - previous).toFixed(2)} שניות אחרי השיא שלכם (${formatTime(previous)}).`;
+  else if (place === 1)
+    line = `${formatTime(me.finish)} — ${((order[1].finish ?? order[1].projected) - me.finish).toFixed(2)} שניות לפני ${PARTIES[order[1].id].short}.`;
+  else
+    line = `${(me.finish - (order[0].finish ?? order[0].projected)).toFixed(2)} שניות אחרי ${PARTIES[order[0].id].short}.`;
+  $('resultLine').textContent = line;
   const lead = order[0].finish ?? order[0].projected;
   $('resultsBoard').innerHTML = order
     .map((r, i) => {

@@ -73,6 +73,20 @@
                 <small>מסלול אחד, שלוש הקפות, שישה נהגים.</small>
               </span>
             </button>
+            <button class="mode" data-mode="trial" role="radio" aria-checked="false">
+              <span class="mode-index">03</span>
+              <span class="mode-copy">
+                <b>נגד השעון</b>
+                <small>לבד על המסלול, מול רוח השיא שלכם.</small>
+              </span>
+            </button>
+            <button class="mode" data-mode="daily" role="radio" aria-checked="false">
+              <span class="mode-index">04</span>
+              <span class="mode-copy">
+                <b>אתגר יומי</b>
+                <small id="dailyInfo">מסלול ונהג קבועים לכולם, כל יום אחרים.</small>
+              </span>
+            </button>
           </div>
 
           <div id="trackPicker" class="track-picker hidden" role="radiogroup" aria-label="בחירת מסלול"></div>
@@ -111,7 +125,7 @@
       <!-- Race HUD -->
       <section id="hud" class="hud hidden" aria-label="נתוני מרוץ">
         <div class="hud-standing">
-          <div class="hud-position"><b id="position">6</b><span>/6</span></div>
+          <div class="hud-position"><b id="position">6</b><span id="fieldSize">/6</span></div>
           <div id="lap" class="hud-lap">הקפה 1/3</div>
           <ol id="leaderboard" class="hud-board" aria-label="דירוג חי"></ol>
         </div>
@@ -244,6 +258,7 @@
           </dl>
           <div class="actions">
             <button id="again" class="primary">עוד מרוץ</button>
+            <button id="share" class="secondary hidden">שיתוף התוצאה</button>
             <button id="homeButton" class="secondary">לתפריט</button>
           </div>
         </div>

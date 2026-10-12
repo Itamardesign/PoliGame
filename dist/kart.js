@@ -30,7 +30,8 @@ import { makeEffects } from './kart-effects.js';
 import { animateKart, resetMotion } from './kart-motion.js';
 import { makeTrails } from './kart-trails.js';
 import { KEY_ACTIONS, readControls } from './kart-input.js';
-import { levelById } from './kart-levels.js';
+import { LEVELS, levelById } from './kart-levels.js';
+import { makeRecorder, sampleGhost, loadGhost } from './ghost.js';
 import { makeHud, formatTime } from './kart-hud.js';
 import { MOODS } from './world-set.js';
 import * as GP from './gp.js';
@@ -66,13 +67,28 @@ const save = (key, value) => {
 };
 const params = new URLSearchParams(location.search);
 let gp = GP.restore(stored('ck-gp', ''));
-let mode =
-  params.get('gp') === '1' || (params.get('gp') === null && stored('ck-mode', 'gp') === 'gp')
-    ? 'gp'
-    : 'single';
-// A Grand Prix race always runs on the course for its round.
+const MODES = ['gp', 'single', 'trial', 'daily'];
+let mode = params.get('mode') ?? (params.get('gp') === '1' ? 'gp' : stored('ck-mode', 'gp'));
+if (!MODES.includes(mode)) mode = 'gp';
+// The daily challenge: one course, one driver and one starting field per calendar day.
+const today = new Date(),
+  dailyKey = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`,
+  dailyHash = [...dailyKey].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7);
+const DAILY = {
+  key: dailyKey,
+  label: `${today.getDate()}.${today.getMonth() + 1}`,
+  level: LEVELS[dailyHash % LEVELS.length].id,
+  driver: (dailyHash >>> 3) % 6,
+  seed: Number(dailyKey)
+};
+// Grand Prix and daily races run on their own course; otherwise the URL picks it.
+const going = params.get('go') === '1';
 const level = levelById(
-  params.get('gp') === '1' && gp && !gp.done ? GP.currentLevel(gp) : params.get('level')
+  going && mode === 'gp' && gp && !gp.done
+    ? GP.currentLevel(gp)
+    : going && mode === 'daily'
+      ? DAILY.level
+      : params.get('level')
 );
 arena.classList.add('level-' + level.id);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -137,6 +153,14 @@ let selected = clamp(Number(stored('ck-driver', '0')) || 0, 0, PARTIES.length - 
   hudClock = 0,
   lastLap = 0,
   playerHits = {},
+  recorder = null,
+  ghost = null,
+  ghostKart = null,
+  lapTimes = [],
+  lapStart = 0,
+  newRecord = false,
+  shareText = '',
+  ghostRecord = null,
   stateBeforePause = 'running',
   introT = 0,
   finishT = 0;
@@ -431,6 +455,7 @@ function clearControls() {
 // ——— Title screen ———
 function choose(i) {
   if (mode === 'gp' && gp && !gp.done && gp.round > 0) return toast('בעונה פעילה אי אפשר להחליף נהג');
+  if (mode === 'daily') return toast('באתגר היומי הנהג קבוע לכולם');
   const changed = selected !== i;
   selected = i;
   save('ck-driver', i);
@@ -444,28 +469,40 @@ function setMode(next) {
   save('ck-mode', next);
   for (const b of document.querySelectorAll('.mode'))
     b.setAttribute('aria-checked', String(b.dataset.mode === next));
-  $('trackPicker').classList.toggle('hidden', next !== 'single');
-  $('playLabel').textContent = next === 'gp' ? 'מתחילים עונה' : 'לזינוק';
+  $('trackPicker').classList.toggle('hidden', next !== 'single' && next !== 'trial');
+  $('playLabel').textContent = {
+    gp: 'מתחילים עונה',
+    single: 'לזינוק',
+    trial: 'נגד השעון',
+    daily: 'לאתגר של היום'
+  }[next];
+  // The daily challenge shows its fixed driver; other modes show the player's own choice.
+  const shown = next === 'daily' ? DAILY.driver : Number(stored('ck-driver', '0')) || 0;
+  if (next === 'daily' || selected !== shown) {
+    selected = shown;
+    renderGarage(shown);
+    $('driverFace').src = faceImages[shown];
+  }
+  const best = stored('ck-daily-' + DAILY.key, '');
+  $('dailyInfo').textContent =
+    `${levelById(DAILY.level).name} · ${PARTIES[DAILY.driver].leader}${best ? ' · היום: מקום ' + best : ''}`;
 }
 function pickTrack(id) {
   if (id === level.id) return;
   const url = new URL(location.href);
   url.searchParams.set('level', id);
+  url.searchParams.set('mode', mode);
   url.searchParams.delete('gp');
   url.searchParams.delete('go');
   location.replace(url.href);
 }
 // Moving between courses reloads the page (each course builds its own world).
-function goToRace(levelId, gpRace) {
-  const url = new URL(location.href);
-  url.searchParams.set('level', levelId);
-  url.searchParams.set('gp', gpRace ? '1' : '0');
-  url.searchParams.set('go', '1');
-  if (levelId === level.id && (gpRace ? 'gp' : 'single') === mode) {
-    history.replaceState(null, '', url.href);
+function goToRace(levelId, raceMode) {
+  if (levelId === level.id && raceMode === mode) {
+    history.replaceState(null, '', `?level=${levelId}&mode=${raceMode}`);
     return startRace_();
   }
-  location.assign(url.href);
+  location.assign(`?level=${levelId}&mode=${raceMode}&go=1`);
 }
 function refreshResumeCard() {
   const active = gp && !gp.done && gp.round > 0;
@@ -475,13 +512,14 @@ function refreshResumeCard() {
       `${PARTIES[gp.player].short} · מרוץ ${gp.round + 1} מתוך ${GP.GP_RACES.length}, ${GP.coalitionSeats(gp)} מנדטים`;
 }
 function play() {
-  if (mode === 'single') return startRace_();
+  if (mode === 'single' || mode === 'trial') return startRace_();
+  if (mode === 'daily') return goToRace(DAILY.level, 'daily');
   if (!gp || gp.done || gp.player !== selected || gp.round === 0) {
     gp = GP.newGrandPrix(selected);
     saveGp();
   }
   if (gp.talksPending) return showTalks();
-  goToRace(GP.currentLevel(gp), true);
+  goToRace(GP.currentLevel(gp), 'gp');
 }
 const saveGp = () => save('ck-gp', gp ? JSON.stringify(gp) : null);
 
@@ -496,11 +534,32 @@ function startRace_() {
   launchPressed = 99;
   playerHits = {};
   lastLap = 0;
-  const inGp = mode === 'gp' && gp && !gp.done;
-  race = makeRace(selected, level.difficulty, Date.now(), track.length, track.shortcuts, level.id, {
-    bend,
-    ...(inGp ? GP.raceOptions(gp) : {})
-  });
+  const inGp = mode === 'gp' && gp && !gp.done,
+    trial = mode === 'trial',
+    daily = mode === 'daily';
+  if (daily) selected = DAILY.driver;
+  race = makeRace(
+    selected,
+    level.difficulty,
+    daily ? DAILY.seed : Date.now(),
+    track.length,
+    track.shortcuts,
+    level.id,
+    {
+      bend,
+      ...(inGp ? GP.raceOptions(gp) : {}),
+      ...(trial ? { solo: true } : {})
+    }
+  );
+  karts.forEach((k, i) => (k.visible = race.racers.some(r => r.id === i)));
+  $('fieldSize').textContent = '/' + race.racers.length;
+  $('leaderboard').classList.toggle('hidden', trial);
+  // Time trial: record this run and race last best's ghost.
+  recorder = trial ? makeRecorder(track.shortcuts) : null;
+  ghost = trial ? loadGhost(stored, level.id) : null;
+  lapTimes = [];
+  lapStart = 0;
+  setupGhostKart();
   karts.forEach(resetMotion);
   karts.forEach(k => k.scale.setScalar(1));
   state = reduced ? 'countdown' : 'intro';
@@ -540,6 +599,8 @@ function startRace_() {
 }
 function goHome() {
   fx.reset();
+  if (ghostKart) ghostKart.visible = false;
+  $('leaderboard').classList.remove('hidden');
   clearDrops();
   arena.classList.remove(
     'boosting',
@@ -699,7 +760,35 @@ function finish() {
     gp.talksPending = !gp.done;
     saveGp();
   }
-  renderResults({ race, order, images: faceImages, place, best, level, gp: inGp ? gp : null, gained });
+  newRecord = false;
+  if (mode === 'trial' && recorder) {
+    const previous = ghost?.time;
+    if (!ghost || player.finish < ghost.time) {
+      newRecord = true;
+      save('ck-ghost-' + level.id, JSON.stringify(recorder.finish(player.finish, selected, lapTimes)));
+    }
+    ghostRecord = previous;
+  }
+  if (mode === 'daily') {
+    const prev = Number(stored('ck-daily-' + DAILY.key, '0'));
+    if (!prev || place < prev) save('ck-daily-' + DAILY.key, place);
+    shareText = `קואליציה קארט · אתגר יומי ${DAILY.label} · ${level.name} · ${PARTIES[selected].leader} · מקום ${place} · ${formatTime(player.finish)}`;
+  }
+  $('share').classList.toggle('hidden', mode !== 'daily');
+  renderResults({
+    race,
+    order,
+    images: faceImages,
+    place,
+    best,
+    level,
+    gp: inGp ? gp : null,
+    gained,
+    mode,
+    newRecord,
+    previous: ghostRecord,
+    daily: DAILY
+  });
   $('again').textContent = inGp ? (gp.done ? 'לספירת המנדטים' : 'למשא ומתן') : 'עוד מרוץ';
   $('homeButton').textContent = 'לתפריט';
   $('results').classList.remove('hidden');
@@ -769,7 +858,7 @@ function nextRace() {
   gp.defectionsChecked = false;
   talkNotices = [];
   saveGp();
-  goToRace(GP.currentLevel(gp), true);
+  goToRace(GP.currentLevel(gp), 'gp');
 }
 function showFinal() {
   state = 'final';
@@ -781,9 +870,34 @@ function showFinal() {
 }
 
 // ——— Karts and camera ———
+function setupGhostKart() {
+  if (ghostKart) {
+    scene.remove(ghostKart);
+    ghostKart = null;
+  }
+  if (!ghost) return;
+  ghostKart = prepareKart(makeKart(ghost.party, logos));
+  ghostKart.traverse(m => {
+    if (!m.isMesh) return;
+    m.material = m.material.clone();
+    m.material.transparent = true;
+    m.material.opacity = 0.36;
+    m.material.depthWrite = false;
+    m.castShadow = false;
+  });
+  ghostKart.userData.name.visible = false;
+  scene.add(ghostKart);
+}
+function updateGhost(dt, ctx) {
+  if (!ghostKart || !race) return;
+  const g = sampleGhost(ghost, race.time, track.shortcuts);
+  ghostKart.visible = !!g && !(g.finished && race.time > ghost.time + 2) && state !== 'home';
+  if (g) animateKart(ghostKart, g, racerFrame(track, g), dt, ctx);
+}
 function updateKarts(dt) {
   if (!race) return;
   const ctx = { elapsed, reduced, camera };
+  updateGhost(dt, ctx);
   for (const r of race.racers) {
     const kart = karts[r.id];
     animateKart(kart, r, racerFrame(track, r), dt, ctx);
@@ -918,6 +1032,17 @@ function updateHUD() {
     coalitionSeats: gp ? GP.coalitionSeats(gp) : 0,
     now: elapsed
   });
+  // Time trial: live gap to the ghost, in seconds at the current pace.
+  if (mode === 'trial' && ghost) {
+    const g = sampleGhost(ghost, race.time, track.shortcuts),
+      p = race.racers[0];
+    if (g && !g.finished) {
+      const gap = (g.s - p.s) / Math.max(p.speed, 20);
+      $('coalitionMeter').classList.remove('hidden');
+      $('coalitionMeter').textContent = `מול השיא ${gap > 0 ? '+' : '−'}${Math.abs(gap).toFixed(2)}`;
+      $('coalitionMeter').style.color = gap > 0 ? '#ff8a8a' : '#4cc38a';
+    }
+  } else $('coalitionMeter').style.color = '';
   if (position < previousRank && race.time > 4 && state === 'running') {
     tone(700, 0.07);
     if (position === 1) callout('מקום ראשון', 'gold');
@@ -992,10 +1117,20 @@ function frame(now) {
     bumpRivals(race);
     syncPickups();
     consumeEvents();
+    recorder?.record(p, race.time);
     const lap = Math.floor(Math.max(0, p.s) / track.length);
-    if (lap > lastLap && !race.done) {
+    if (lap > lastLap) {
       lastLap = lap;
-      callout(lap === 2 ? 'הקפה אחרונה' : 'הקפה 2', lap === 2 ? 'gold' : '');
+      lapTimes.push(race.time - lapStart);
+      lapStart = race.time;
+      const split = lapTimes.at(-1),
+        ref = ghost?.laps?.[lap - 1];
+      if (mode === 'trial')
+        callout(
+          `הקפה ${lap} · ${formatTime(split)}${ref ? ' (' + (split - ref > 0 ? '+' : '−') + Math.abs(split - ref).toFixed(2) + ')' : ''}`,
+          ref && split < ref ? 'gold' : ''
+        );
+      else if (!race.done) callout(lap === 2 ? 'הקפה אחרונה' : 'הקפה 2', lap === 2 ? 'gold' : '');
       tone(850, 0.25);
     }
     if (race.time > 7) $('raceHint').classList.add('hidden');
@@ -1084,7 +1219,7 @@ $('resumeSeason').onclick = () => {
   mode = 'gp';
   selected = gp.player;
   if (gp.talksPending) showTalks();
-  else goToRace(GP.currentLevel(gp), true);
+  else goToRace(GP.currentLevel(gp), 'gp');
 };
 $('abandonSeason').onclick = () => {
   gp = null;
@@ -1092,6 +1227,15 @@ $('abandonSeason').onclick = () => {
   refreshResumeCard();
 };
 for (const b of document.querySelectorAll('.mode')) b.onclick = () => setMode(b.dataset.mode);
+$('share').onclick = async () => {
+  try {
+    if (navigator.share) await navigator.share({ text: shareText });
+    else {
+      await navigator.clipboard.writeText(shareText);
+      toast('התוצאה הועתקה');
+    }
+  } catch {}
+};
 arena.addEventListener('pointerdown', () => state === 'intro' && beginCountdown());
 canvas.addEventListener('pointerup', e => {
   if (e.pointerType !== 'mouse' && touchDevice() && state === 'running' && race?.racers[0].item)
@@ -1200,7 +1344,7 @@ $('play').disabled = false;
 requestAnimationFrame(frame);
 if (params.get('go') === '1') {
   // Arrived from a menu or between Grand Prix races: drop straight onto the grid.
-  history.replaceState(null, '', location.pathname + '?level=' + level.id + (mode === 'gp' ? '&gp=1' : ''));
+  history.replaceState(null, '', `${location.pathname}?level=${level.id}&mode=${mode}`);
   if (mode === 'gp' && gp?.talksPending) showTalks();
   else startRace_();
 }

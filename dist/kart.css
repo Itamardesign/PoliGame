@@ -1839,3 +1839,16 @@ dialog#info kbd {
     inset 0 90px 60px -40px rgb(0 0 0 / 0.7),
     inset 0 -90px 60px -40px rgb(0 0 0 / 0.7);
 }
+
+/* Four modes: two columns on wide screens. */
+.mode-list {
+  grid-template-columns: 1fr 1fr;
+}
+.mode-copy b {
+  font-size: 18px;
+}
+@media (max-width: 760px) {
+  .mode-list {
+    grid-template-columns: 1fr 1fr;
+  }
+}

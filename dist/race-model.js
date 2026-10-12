@@ -148,7 +148,8 @@ export function makeRace(
   options = {}
 ) {
   const random = rng(seed);
-  const order = [party, ...PARTIES.map((_, i) => i).filter(i => i !== party)];
+  // A time trial races alone; everything else runs the full field of six.
+  const order = options.solo ? [party] : [party, ...PARTIES.map((_, i) => i).filter(i => i !== party)];
   const bend = options.bend ?? (() => 0);
   const race = {
     time: 0,
@@ -167,6 +168,7 @@ export function makeRace(
     // Grand Prix: parties allied with the player, and the handicaps their demands impose.
     coalition: new Set(options.coalition ?? []),
     handicap: options.handicap ?? {},
+    trial: !!options.solo,
     boxes: 0,
     done: false,
     used: 0,
