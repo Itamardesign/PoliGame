@@ -120,6 +120,37 @@ try {
     assert.equal(await page.locator('#offers li').count(), 5);
     assert.equal(await page.locator('[data-invite="1"]').count(), 0, 'a bigger party must refuse');
     await page.locator('[data-invite="2"]').click();
+    // Continue to the next race: the page moves to the second course with the coalition in place.
+    await page.locator('#nextRace').click();
+    await page.waitForURL(/level=market/);
+    await page.waitForFunction(
+      () => window.readKartState && ['intro', 'countdown'].includes(readKartState().state),
+      null,
+      {
+        timeout: 60000
+      }
+    );
+    const gpState = await page.evaluate(() => readKartState());
+    assert.equal(gpState.level, 'market');
+    assert.deepEqual(gpState.gp.coalition, [2]);
+    assert.ok(gpState.race.racers.length === 6);
+    await page.goto(BASE + '/?qa=1');
+    await ready(page);
+    await page.evaluate(() => {
+      __ck.setGp({
+        version: 2,
+        player: 0,
+        round: 1,
+        seats: [7, 12, 9, 5, 4, 3],
+        history: [],
+        coalition: [2],
+        loyalty: { 2: 0.65 },
+        left: [],
+        done: false,
+        talksPending: true
+      });
+      __ck.showTalks();
+    });
     assert.match(await page.locator('#talksSum').textContent(), /16/);
     await page.evaluate(() => {
       __ck.setGp({
