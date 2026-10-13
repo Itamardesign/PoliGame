@@ -1357,8 +1357,14 @@ refreshResumeCard();
 document.title = `${level.name} — קואליציה קארט`;
 setCamera(true);
 // The loading poster fills its bar, then lifts away to reveal the title screen.
-$('loading').classList.add('done');
-setTimeout(() => $('loading').classList.add('hidden'), reduced ? 0 : 900);
+// It stays up at least long enough to be seen, even when everything is cached.
+setTimeout(
+  () => {
+    $('loading').classList.add('done');
+    setTimeout(() => $('loading').classList.add('hidden'), reduced ? 0 : 900);
+  },
+  Math.max(0, 1800 - performance.now())
+);
 $('play').disabled = false;
 requestAnimationFrame(frame);
 if (params.get('go') === '1') {

@@ -7,6 +7,8 @@ const SHELL = [
   './manifest.webmanifest',
   './fonts.css',
   './kart.css',
+  './home.css',
+  './assets/loading-art.webp',
   './kart.js',
   './pwa.js',
   './vendor/three.module.min.js',

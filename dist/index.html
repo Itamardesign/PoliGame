@@ -19,16 +19,15 @@
     <link rel="stylesheet" href="./fonts.css" />
     <link rel="stylesheet" href="./kart.css" />
     <link rel="stylesheet" href="./home.css" />
-    <link rel="preload" as="image" href="./assets/loading-art.jpg" />
   </head>
   <body>
     <main id="arena" class="arena">
       <canvas id="game" tabindex="0" aria-label="מסלול המרוץ"></canvas>
       <div class="vignette" aria-hidden="true"></div>
       <div id="loading" class="loading" role="status">
-        <div class="load-art" aria-hidden="true"></div>
+        <div class="load-backdrop" aria-hidden="true"></div>
         <div class="load-rays" aria-hidden="true"></div>
-        <div class="load-streaks" aria-hidden="true"></div>
+        <div class="load-poster" aria-hidden="true"><i class="load-glint"></i></div>
         <div class="load-shade" aria-hidden="true"></div>
         <div class="load-content">
           <div class="logo" aria-hidden="true">
@@ -40,9 +39,35 @@
             <span class="load-fill"><i class="load-head"></i></span>
             <span class="load-finish"></span>
           </div>
-          <span class="load-text">מחממים מנועים · טוענים את המסלול…</span>
+          <span id="loadTip" class="load-text">מחממים מנועים…</span>
         </div>
       </div>
+      <script>
+        // Show the poster only once it has loaded (the screen still works without it), and rotate tips.
+        (() => {
+          const box = document.getElementById('loading'),
+            art = new Image();
+          art.onload = () => box.classList.add('art-ready');
+          art.src = './assets/loading-art.webp';
+          const tips = [
+            'מחממים מנועים…',
+            'סופרים פתקים…',
+            'מרכיבים קואליציה…',
+            'טיפ: דריפט ארוך = טורבו סגול',
+            'טיפ: בלי 61 אין ממשלה',
+            'מנקים את מסלול הכנסת…'
+          ];
+          let n = 0;
+          const tip = document.getElementById('loadTip'),
+            timer = setInterval(() => {
+              if (box.classList.contains('done')) return clearInterval(timer);
+              tip.classList.remove('tick');
+              void tip.offsetWidth;
+              tip.textContent = tips[++n % tips.length];
+              tip.classList.add('tick');
+            }, 1400);
+        })();
+      </script>
 
       <!-- Title screen -->
       <section id="home" class="home" aria-label="מסך פתיחה">
