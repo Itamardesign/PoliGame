@@ -11,6 +11,17 @@ export const formatTime = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padS
 const name = id => PARTIES[id].short;
 
 const compactBallots = () => innerWidth <= 760;
+// Campaign-season headlines (October 2026), written as satire rather than reporting.
+const NEWS = [
+  'סקר: אף גוש לא מגיע ל־61',
+  'הבחירות במועדן: 27 באוקטובר',
+  'ועדת הבחירות: יש לטשטש קארטים בתשדירים',
+  'עשרות אלפים טסים הביתה להצביע',
+  'חוק הגיוס בלב הקמפיין',
+  'המפלגות נלחמות על כל פתק — ממש כל פתק',
+  'תיקו בסקרים: 52 מול 52',
+  'הקלפיות נפתחות בעוד שבועיים'
+];
 export function makeHud({ arena, track, reduced, touch }) {
   // Ticker: one headline at a time, each held long enough to read.
   const queue = [];
@@ -24,8 +35,14 @@ export function makeHud({ arena, track, reduced, touch }) {
     queue.sort((a, b) => b.priority - a.priority);
     if (queue.length > 6) queue.length = 6;
   }
+  let newsAt = 6,
+    newsIndex = Math.floor(Math.random() * NEWS.length);
   function pumpTicker(now) {
     if (showing && now - shownAt < 2.6) return;
+    if (!queue.length && now > newsAt) {
+      newsAt = now + 14;
+      queue.push({ text: NEWS[newsIndex++ % NEWS.length], priority: 0, at: now });
+    }
     const next = queue.shift();
     if (!next) return;
     showing = next;
@@ -71,6 +88,11 @@ export function makeHud({ arena, track, reduced, touch }) {
         return [`העברה תקציבית: ${who} ${e.player ? 'לוקחים' : 'לוקח'} ${e.amount} פתקים מ${target}`, 2];
       case 'ability':
         return [`${who}: ${ABILITIES[e.id].name}`, 3];
+      case 'confiscated':
+        return [
+          `ועדת הבחירות מחרימה ${e.player ? 'לכם' : 'ל' + name(e.id)} את ה${ITEMS[e.item]?.short ?? 'אביזר'}`,
+          3
+        ];
       case 'drop-hit':
         return [`${who} ${e.player ? 'נתקעים' : 'נתקע'} בחסימה`, 1];
       case 'shortcut-enter':

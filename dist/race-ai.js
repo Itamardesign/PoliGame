@@ -218,6 +218,11 @@ function chooseLine(race, r, dt) {
       const d = (((p.s - r.s) % race.length) + race.length) % race.length;
       if (d > 1.5 && d < reach && notices(race, r, 'b' + p.s + lap)) hazards.push({ x: p.x, clear: 3.1, d });
     }
+    if (r.item)
+      for (const c of race.checkpoints ?? []) {
+        const d = (((c.s - r.s) % race.length) + race.length) % race.length;
+        if (d > 1.5 && d < reach) hazards.push({ x: (c.x0 + c.x1) / 2, clear: (c.x1 - c.x0) / 2 + 1.4, d });
+      }
     for (const drop of race.drops ?? []) {
       const d = drop.s - r.s;
       if (d > 1.5 && d < reach && notices(race, r, 'd' + drop.id)) hazards.push({ x: drop.x, clear: 3, d });

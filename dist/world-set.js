@@ -15,6 +15,8 @@ import {
   textCanvasTexture,
   batchStatic
 } from './world-kit.js';
+import { buildNews, inTunnel } from './world-news.js';
+import { layoutCheckpoints } from './race-course.js';
 
 const DISTRICT = u => (u < 0.23 ? 'avenue' : u < 0.48 ? 'bridge' : u < 0.76 ? 'market' : 'park');
 export const MOODS = {
@@ -127,8 +129,12 @@ function ribbon(track, offset, width, material, height = 0, uvScale = 8) {
 
 // Height of the ground beside the road: road level out to 12.8 m, then the embankment slopes
 // down to the terrain at 17 m.
+// Above this height the road is a viaduct on piers: no embankment, and the ground beside it is
+// the terrain below.
+export const VIADUCT = 5.5;
 export const sideY = (roadY, off) => {
   const a = Math.abs(off);
+  if (roadY > VIADUCT && a > 12.8) return 0;
   return a <= 12.8 ? roadY : a >= 17 ? 0 : roadY * (1 - (a - 12.8) / 4.2);
 };
 // Place a group on the road frame: local +z along the road, +x toward the road's left.
@@ -324,7 +330,9 @@ export function buildWorld(scene, track, { mood = 'day', logos = [], level } = {
       const s = (i / 280) * L,
         a = track.at(s, side * 12.8).p,
         b = track.at(s, side * 17).p;
-      v.push(a.x, a.y - 0.13, a.z, b.x, -0.05, b.z);
+      // On a viaduct the bank collapses to nothing; piers carry the road instead.
+      if (a.y > VIADUCT) v.push(a.x, a.y - 0.13, a.z, a.x, a.y - 0.13, a.z);
+      else v.push(a.x, a.y - 0.13, a.z, b.x, -0.05, b.z);
       uv.push(0, s / 6, 1, s / 6);
       if (i < 280) ix.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
     }
@@ -344,7 +352,7 @@ export function buildWorld(scene, track, { mood = 'day', logos = [], level } = {
     pools = [];
   for (let s = 10; s < L; s += 23)
     for (const side of [-1, 1]) {
-      if (DISTRICT(s / L) === 'bridge') continue;
+      if (track.at(s).p.y > VIADUCT || inTunnel(s, L)) continue;
       const { p, t } = track.at(s + (side > 0 ? 11 : 0), side * 13.4);
       const ry = Math.atan2(t.x, t.z) + (side > 0 ? Math.PI / 2 : -Math.PI / 2);
       lamps.push({ x: p.x, y: sideY(p.y, 13.4), z: p.z, ry });
@@ -437,7 +445,7 @@ export function buildWorld(scene, track, { mood = 'day', logos = [], level } = {
     for (const side of [-1, 1]) {
       const off = side * (15.5 + random() * 2);
       const { p } = track.at(s + random() * 4, off);
-      if (!clear(p.x, p.z, 14.5)) continue;
+      if (!clear(p.x, p.z, 14.5) || inTunnel(s, L)) continue;
       const y = sideY(p.y, off);
       if (d === 'avenue' && side < 0)
         palms.push({ x: p.x, y, z: p.z, ry: random() * 6, s: 0.9 + random() * 0.3 });
@@ -496,8 +504,8 @@ export function buildWorld(scene, track, { mood = 'day', logos = [], level } = {
     if (i === 0) return;
     const [he, en, ar] = signs[i] ?? [section.name, '', ''];
     const g = along(S, track, section.start * L - 14);
-    for (const x of [-11.8, 11.8]) add(g, new T.BoxGeometry(0.35, 7.6, 0.35), K('metal'), x, 3.8, 0);
-    add(g, new T.BoxGeometry(24, 0.45, 0.45), K('metal'), 0, 7.4, 0);
+    for (const x of [-11.8, 11.8]) add(g, new T.BoxGeometry(0.35, 12.6, 0.35), K('metal'), x, 6.3, 0);
+    add(g, new T.BoxGeometry(24, 0.45, 0.45), K('metal'), 0, 12.4, 0);
     const sign = new T.Mesh(
       new T.PlaneGeometry(6.4, 3.2),
       new T.MeshStandardMaterial({
@@ -508,10 +516,10 @@ export function buildWorld(scene, track, { mood = 'day', logos = [], level } = {
         emissiveMap: night ? roadSignTexture(he, en, ar) : null
       })
     );
-    sign.position.set(0, 7.6, -0.3);
+    sign.position.set(0, 12.6, -0.3);
     sign.rotation.y = Math.PI;
     g.add(sign);
-    add(g, new T.BoxGeometry(6.6, 3.4, 0.08), K('metal'), 0, 7.6, -0.2);
+    add(g, new T.BoxGeometry(6.6, 3.4, 0.08), K('metal'), 0, 12.6, -0.2);
   });
 
   // ——— Avenue: grandstand crowd behind police barriers, palms, the Knesset in the infield. ———
@@ -531,7 +539,7 @@ export function buildWorld(scene, track, { mood = 'day', logos = [], level } = {
       '#2b3440',
       '#d9d2c3'
     ];
-    for (let s = -46; s < 70; s += 2.4)
+    for (let s = -27; s < 70; s += 2.4)
       for (const side of [-1, 1]) {
         const { p, t } = track.at(s, side * 13.9);
         const ry = Math.atan2(t.x, t.z);
@@ -610,26 +618,31 @@ export function buildWorld(scene, track, { mood = 'day', logos = [], level } = {
     const a = 0.25 * L,
       b = 0.38 * L,
       mid = (a + b) / 2;
+    // Every high stretch of road is a viaduct: white rails along the deck, piers to the ground.
     const deck = [];
-    for (let s = a; s < b; s += 3)
+    for (let s = 0; s < L; s += 3) {
+      if (track.at(s).p.y <= VIADUCT) continue;
       for (const x of [-12.1, 12.1]) {
         const { p, t } = track.at(s, x);
         deck.push({ x: p.x, y: p.y + 0.55, z: p.z, ry: Math.atan2(t.x, t.z) });
       }
+    }
     instanced(scene, new T.BoxGeometry(0.12, 1.1, 3), K('#f1f1ee'), deck);
-    // Piers under the deck.
-    for (let s = a; s < b; s += 9) {
-      const g = along(S, track, s);
+    for (let s = 0; s < L; s += 9) {
+      if (track.at(s).p.y <= VIADUCT) continue;
+      const g = along(S, track, s, 0, track.at(s).p.y);
       const h = g.position.y + 0.4;
       for (const x of [-6, 6])
         add(g, new T.CylinderGeometry(0.9, 1.1, h, 12), K('#e7e4dc'), x, -h / 2 - 0.1, 0);
       add(g, new T.BoxGeometry(22, 0.6, 2), K('#e7e4dc'), 0, -0.4, 0);
     }
-    const base = track.at(mid, -17),
-      top = base.p
-        .clone()
-        .add(new T.Vector3(0, 46, 0))
-        .addScaledVector(base.t, -9);
+    // The pylon stands on the ground beside the deck and leans back over it.
+    const base = track.at(mid, -17);
+    base.p.y = 0;
+    const top = base.p
+      .clone()
+      .add(new T.Vector3(0, 56, 0))
+      .addScaledVector(base.t, -9);
     const pylon = new T.Mesh(new T.CylinderGeometry(0.7, 1.4, base.p.distanceTo(top), 12), K('#f6f6f3'));
     pylon.position.copy(base.p).lerp(top, 0.5);
     pylon.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), top.clone().sub(base.p).normalize());
@@ -876,8 +889,11 @@ export function buildWorld(scene, track, { mood = 'day', logos = [], level } = {
     );
   }
 
+  const news = buildNews(scene, S, track, { mood, checkpoints: layoutCheckpoints(L) });
+  updates.push(t => news.update(t));
   batchStatic(S, animated);
   return {
+    drawPoll: news.drawPoll,
     samples,
     update(t) {
       for (const f of updates) f(t);

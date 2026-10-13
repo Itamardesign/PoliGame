@@ -220,3 +220,30 @@ test('ballot slips raise top speed, count as votes, and a spin knocks three loos
   assert.equal(p.votes, 12);
   assert.ok(r.events.some(e => e.type === 'ballots-lost' && e.count === 3));
 });
+
+test('the Elections Committee confiscates items carried through its lane, and the crest throws karts into the air', async () => {
+  const { makeTrack } = await import('../dist/kart-world.js');
+  const track = makeTrack('jerusalem');
+  const r = makeRace(0, 'normal', 6161, track.length, [], 'jerusalem', {
+    bend: s => track.bend(s),
+    height: s => track.at(s).p.y
+  });
+  r.racers.slice(1).forEach((x, i) => (x.s = -1000 - i * 10));
+  const p = r.racers[0],
+    gate = r.checkpoints[0];
+  p.s = gate.s - 4;
+  p.x = 5;
+  p.speed = 30;
+  p.item = 'shield';
+  for (let i = 0; i < 20; i++) stepRace(r, 1 / 60, { accelerate: true });
+  assert.equal(p.item, null);
+  assert.ok(r.events.some(e => e.type === 'confiscated' && e.item === 'shield'));
+  const crest = r.pickups.find(x => x.type === 'crest');
+  assert.ok(crest);
+  p.s = crest.s - 3;
+  p.x = -4;
+  p.speed = 40;
+  p.air = 0;
+  for (let i = 0; i < 12; i++) stepRace(r, 1 / 60, { accelerate: true });
+  assert.ok(p.air > 0 && p.airTotal > 1.1);
+});

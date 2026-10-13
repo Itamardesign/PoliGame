@@ -563,31 +563,41 @@ export function makeKart(index, logos) {
   });
   return root;
 }
-export function makeTrack(levelId = 'jerusalem') {
-  const base = [
+export function makeTrack(levelId = 'jerusalem', override = null) {
+  // Start on Knesset Avenue, climb onto the Chords Bridge, drop through a hairpin into the
+  // Mahane Yehuda S-bends, over a crest on the way to Yemin Moshe, round the Old City hairpin and
+  // back through the Knesset tunnel. Heights are in metres before scaling.
+  const base = override ?? [
     [0, 0, 0],
-    [0, 1, 64],
-    [42, 3, 110],
-    [97, 5, 100],
-    [132, 2, 50],
-    [103, 0, 10],
-    [127, 1, -45],
-    [89, 4, -99],
-    [27, 2, -107],
-    [-29, 0, -80],
-    [-46, 0, -34]
+    [0, 0, 62],
+    [12, 1, 94],
+    [44, 6, 116],
+    [84, 10, 120],
+    [118, 9, 106],
+    [136, 5, 80],
+    [141, 2, 52],
+    [133, 1, 26],
+    [138, 0, 0],
+    [128, 0, -27],
+    [138, 0, -54],
+    [126, 1, -82],
+    [94, 3, -104],
+    [52, 5, -116],
+    [8, 2, -112],
+    [-34, 0, -104],
+    [-62, 0, -88],
+    [-68, 0, -60],
+    [-46, 0, -43],
+    [-21, 0, -24]
   ];
   const layouts = {
     jerusalem: base,
-    market: [base[0], ...base.slice(1).reverse()].map(([x, y, z], i) => [
-      x + (i ? Math.sin(i * 1.8) * 3 : 0),
-      y,
-      z + (i ? Math.cos(i * 1.6) * 3 : 0)
-    ]),
+    // The same city driven the other way, stretched a little so it is its own course.
+    market: [base[0], ...base.slice(1).reverse()].map(([x, y, z]) => [x * 1.05, y, z * 0.97]),
     midnight: base.map(([x, y, z], i) => [
-      x * 1.06 + (i ? Math.sin(i * 1.4) * 2 : 0),
+      x * 1.06 + (i ? Math.sin(i * 1.4) * 1 : 0),
       y,
-      z * 0.96 + (i ? Math.cos(i * 1.3) * 2 : 0)
+      z * 0.96 + (i ? Math.cos(i * 1.3) * 1 : 0)
     ])
   };
   const level = levelById(levelId),
@@ -696,6 +706,17 @@ export function makePickup(type) {
     lamp.position.set(0.85, 1.32, 0);
     g.add(lamp);
     g.userData.blink = lamp;
+  }
+  if (type === 'crest') {
+    // The top of the hill: a painted line across the road and jump chevrons at both edges.
+    box(g, 19, 0.03, 0.5, '#f2c14e', 0, 0.08, 0);
+    for (const x of [-10.6, 10.6]) {
+      box(g, 0.12, 1.4, 0.12, '#3d3d3d', x, 0.7, 0);
+      const board = label('▲ קפיצה', 1.8, 0.7, '#f2c14e', '#1b1d22', 90);
+      board.position.set(x, 1.6, -0.08);
+      board.rotation.y = Math.PI;
+      g.add(board);
+    }
   }
   if (type === 'boost') {
     box(g, 3.4, 0.05, 6.2, '#25303a', 0, 0.09, 0);

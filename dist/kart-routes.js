@@ -1,31 +1,19 @@
 import * as T from './vendor/three.module.min.js';
 import { kitMaterial, scaledBox, instanced, GEO } from './world-kit.js';
+// Two secret routes, each cutting the inside of a corner: Bloomfield Garden inside the Old City
+// hairpin, and the alleys of the Iraqi Market through the Mahane Yehuda S-bends.
 export const SHORTCUTS = [
-  {
-    id: 'garden',
-    name: 'גן סודי',
-    start: 0.12,
-    end: 0.27,
-    side: -1,
-    color: '#e893db',
-    width: 5.4,
-    entryX: -7.8,
-    exitX: -5.4
-  },
-  {
-    id: 'alley',
-    name: 'סמטת הספינים',
-    start: 0.39,
-    end: 0.53,
-    side: 1,
-    color: '#f6b85f',
-    width: 5.2,
-    entryX: 7.8,
-    exitX: 5.4
-  }
+  { id: 'garden', name: 'גן בלומפילד', start: 0.815, end: 0.905, color: '#e893db', width: 5.4 },
+  { id: 'alley', name: 'השוק העיראקי', start: 0.43, end: 0.565, color: '#f6b85f', width: 5.2 }
 ];
 export function makeShortcuts(track) {
-  return SHORTCUTS.map(spec => {
+  return SHORTCUTS.map(raw => {
+    // The entrance sits on the inside of the corner the route cuts.
+    let turn = 0;
+    for (let k = 0; k <= 20; k++)
+      turn += track.bend((raw.start + ((raw.end - raw.start) * k) / 20) * track.length);
+    const side = -Math.sign(turn) || 1,
+      spec = { ...raw, side, entryX: side * 7.8, exitX: side * 5.4 };
     const start = spec.start * track.length,
       end = spec.end * track.length,
       a = track.at(start, spec.entryX),
@@ -70,6 +58,9 @@ export function routeBend(track, r) {
 // The two secret routes, dressed as real places: an almond-blossom garden path and a
 // Nachlaot-style stone alley under arches and washing lines. Lanterns mark the line.
 export function buildShortcuts(parent, track, box, label, mat) {
+  // Main-road centreline samples: scenery for a secret route must never sit on the road.
+  const road = Array.from({ length: 400 }, (_, i) => track.at((i / 400) * track.length).p);
+  const offRoad = (v, margin = 12) => road.every(p => (p.x - v.x) ** 2 + (p.z - v.z) ** 2 > margin * margin);
   const stone = kitMaterial('stone'),
     paving = kitMaterial('paving');
   for (const route of track.shortcuts) {
@@ -156,12 +147,21 @@ export function buildShortcuts(parent, track, box, label, mat) {
           crowns.push({ x: q.x, y: q.y, z: q.z, ry: d, s: 0.9 });
         }
       } else {
+        g.updateMatrixWorld(true);
+        let both = true;
         for (const side of [-1, 1]) {
+          const at = new T.Vector3(side * 3.6, 0, 0).applyMatrix4(g.matrixWorld);
+          if (!offRoad(at)) {
+            both = false;
+            continue;
+          }
           const wall = new T.Mesh(scaledBox(1.4, 5.2, 10.5), stone);
           wall.position.set(side * 3.6, 2.6, 0);
           wall.castShadow = wall.receiveShadow = true;
           g.add(wall);
         }
+        // Arches and washing lines only where the alley is walled on both sides.
+        if (!both) continue;
         const arch = new T.Mesh(new T.TorusGeometry(3.6, 0.45, 6, 16, Math.PI), stone);
         arch.position.set(0, 4.6, 0);
         g.add(arch);

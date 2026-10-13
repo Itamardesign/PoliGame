@@ -35,7 +35,8 @@ import { makeRecorder, sampleGhost, loadGhost } from './ghost.js';
 import { makeHud, formatTime } from './kart-hud.js';
 import { makeAudio } from './kart-audio.js';
 import { makeTouchControls } from './kart-touch.js';
-import { MOODS } from './world-set.js';
+import { MOODS, VIADUCT } from './world-set.js';
+import { inTunnel, ELECTION_DAY } from './world-news.js';
 import * as GP from './gp.js';
 import {
   renderDrivers,
@@ -164,7 +165,8 @@ let selected = clamp(Number(stored('ck-driver', '0')) || 0, 0, PARTIES.length - 
   ghostRecord = null,
   stateBeforePause = 'running',
   introT = 0,
-  finishT = 0;
+  finishT = 0,
+  pollDrawnAt = 0;
 let sensitivity = clamp(Number(stored('ck-steering', '1')) || 1, 0.65, 1.35),
   wideCamera = stored('ck-camera', 'wide') === 'wide';
 if (gp && gp.player !== undefined && mode === 'gp' && !gp.done) selected = gp.player;
@@ -290,21 +292,23 @@ function updateTrails(dt) {
 // Pickup meshes follow the same deterministic layout the race simulates, index for index.
 // Pickups follow the same deterministic layout the race simulates, index for index. Each kind
 // is drawn as instances: one draw call per part of the model, however many sit on the track.
-const bend = s => track.bend(s);
+const bend = s => track.bend(s),
+  height = s => track.at(s).p.y;
 // The bridge deck has rails and the start straight has crowd barriers: both are solid.
 const walls = s => {
   const at = ((s % track.length) + track.length) % track.length,
     u = at / track.length;
-  if (u > 0.25 && u < 0.38) return 10.9;
-  if (at > track.length - 46 || at < 70) return 12.7;
+  if (track.at(s).p.y > VIADUCT) return 10.9;
+  if (inTunnel(s, track.length)) return 11.6;
+  if (at > track.length - 27 || at < 70) return 12.7;
   return null;
 };
-const pickups = layoutPickups(track.length, bend).map(({ type, s, x }) => {
+const pickups = layoutPickups(track.length, bend, height).map(({ type, s, x }) => {
   const { p, t } = track.at(s, x);
   return { type, s, x, pos: p, yaw: Math.atan2(t.x, t.z), visible: true, spin: 0 };
 });
 const pickupKinds = {};
-for (const type of ['box', 'coin', 'barrier', 'boost', 'ramp']) {
+for (const type of ['box', 'coin', 'barrier', 'boost', 'ramp', 'crest']) {
   const model = makePickup(type),
     list = pickups.filter(p => p.type === type);
   model.updateMatrixWorld(true);
@@ -525,6 +529,7 @@ function startRace_() {
     level.id,
     {
       bend,
+      height,
       walls,
       ...(inGp ? GP.raceOptions(gp) : {}),
       ...(trial ? { solo: true } : {})
@@ -696,6 +701,11 @@ function consumeEvents() {
       tone(1200, 0.3);
     }
     if (e.type === 'pickup') tone(900, 0.05);
+    if (e.type === 'confiscated') {
+      callout('ועדת הבחירות החרימה את האביזר', 'danger');
+      tone(260, 0.3, 'square');
+      pulse([30, 40, 30]);
+    }
     if (e.type === 'ballots-lost') {
       toast(`איבדתם ${e.count} פתקים`);
       pulse([15, 30, 15]);
@@ -906,6 +916,7 @@ function updateKarts(dt) {
   }
 }
 const camTarget = new T.Vector3();
+let qaView = null;
 let camSwing = 0;
 const compact = () => innerWidth <= 760;
 function setCamera(snap = false, dt = 1 / 60) {
@@ -980,6 +991,16 @@ function setCamera(snap = false, dt = 1 / 60) {
     position.addScaledVector(a.right, camSwing);
     look.addScaledVector(a.right, camSwing * 0.35);
     if (r.air > 0) position.y += Math.sin((1 - r.air / r.airTotal) * Math.PI) * 1.4;
+  }
+  // QA: a fixed view of any point on the track (only set through the ?qa=1 hooks).
+  if (qaView) {
+    const a = track.at(qaView.s - qaView.back, qaView.x);
+    position = a.p.clone().add(new T.Vector3(0, qaView.up, 0));
+    look = track
+      .at(qaView.s, 0)
+      .p.clone()
+      .add(new T.Vector3(0, qaView.up * 0.35, 0));
+    snap = true;
   }
   camera.position.lerp(position, snap ? 1 : -Math.expm1(-8 * dt));
   camTarget.lerp(look, snap ? 1 : -Math.expm1(-10 * dt));
@@ -1181,6 +1202,18 @@ function frame(now) {
     updateTrails(dt);
     setCamera(false, dt);
     scenery.update(elapsed);
+    if (race && state === 'running' && elapsed - pollDrawnAt > 0.5) {
+      pollDrawnAt = elapsed;
+      const order = ranking(race);
+      scenery.drawPoll(
+        order.map((r, i) => ({
+          name: PARTIES[r.id].short,
+          color: PARTIES[r.id].color,
+          seats: (GP.SEATS_BY_PLACE[i] ?? 0) + Math.round(r.votes / 4)
+        })),
+        level.name
+      );
+    }
     updateHeadlight();
     drawPickups(dt);
     for (const p of confetti) {
@@ -1449,5 +1482,8 @@ if (params.get('qa') === '1')
     showTalks,
     showFinal,
     goHome,
-    faces: faceImages
+    faces: faceImages,
+    view(u, back = 30, up = 9, x = 0) {
+      qaView = u === null ? null : { s: u * track.length, back, up, x };
+    }
   };

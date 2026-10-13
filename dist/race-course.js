@@ -33,11 +33,12 @@ export function encounterAt(e, time, lap = 0) {
 }
 
 // Pickup radius by type; coins widen under a magnet.
-export const PICKUP_RADIUS = { coin: 1.6, box: 1.6, ramp: 2.5, boost: 1.8, barrier: 1.45 };
+export const PICKUP_RADIUS = { coin: 1.6, box: 1.6, ramp: 2.5, boost: 1.8, barrier: 1.45, crest: 12 };
 // Seconds a collected ballot box or ballot slip stays gone.
 export const RESPAWN = { coin: 7, box: 2.2 };
 
-export function layoutPickups(length, bend = () => 0) {
+// height(s) gives the road's elevation, used to find the crest of the hill for the big jump.
+export function layoutPickups(length, bend = () => 0, height = null) {
   const list = [];
   const add = (type, s, x) => list.push({ type, s, x, hiddenUntil: -1 });
   for (let s = 35; s < length; s += 67) for (const x of [-6.5, 0, 6.5]) add('box', s, x);
@@ -46,5 +47,21 @@ export function layoutPickups(length, bend = () => 0) {
   for (let s = 68; s < length; s += 84) add('barrier', s, Math.sin(s * 0.2) * 6.2);
   for (let s = 95; s < length; s += 150) add('boost', s, Math.sign(bend(s) || 1) * -7.3);
   for (const u of [0.33, 0.73]) add('ramp', length * u, 0);
-  return list;
+  // The temptation in the committee's lane: a boost strip right under the gantry.
+  add('boost', length * 0.165 + 3, 5.6);
+  // The crest on the way to Yemin Moshe: the whole width of the road leaves the ground.
+  if (height) {
+    let best = null;
+    for (let s = length * 0.58; s < length * 0.8; s += 2) if (!best || height(s) > height(best)) best = s;
+    if (best) add('crest', best, 0);
+  }
+  // A ramp on top of the crest would double up; drop the one nearby.
+  const crest = list.find(p => p.type === 'crest');
+  return crest ? list.filter(p => p.type !== 'ramp' || Math.abs(p.s - crest.s) > 40) : list;
+}
+
+// The Elections Committee checkpoint on Knesset Avenue: one lane, under a gantry, over a boost
+// strip. Drive through holding an item and the committee confiscates it.
+export function layoutCheckpoints(length) {
+  return [{ s: length * 0.165, x0: 1.2, x1: 10, label: 'ועדת הבחירות' }];
 }

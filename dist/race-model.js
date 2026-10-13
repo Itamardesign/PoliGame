@@ -1,5 +1,5 @@
 import { makeBrain, aiInput } from './race-ai.js';
-import { layoutPickups, PICKUP_RADIUS, RESPAWN } from './race-course.js';
+import { layoutPickups, layoutCheckpoints, PICKUP_RADIUS, RESPAWN } from './race-course.js';
 import {
   grantItem,
   useItem,
@@ -161,7 +161,8 @@ export function makeRace(
     bend,
     // Solid sides (bridge rails, crowd barriers): distance from the centre line, or null.
     walls: options.walls ?? (() => null),
-    pickups: options.pickups === false ? [] : layoutPickups(length, bend),
+    pickups: options.pickups === false ? [] : layoutPickups(length, bend, options.height),
+    checkpoints: options.pickups === false ? [] : layoutCheckpoints(length),
     events: [],
     eventSeq: 0,
     projectiles: [],
@@ -258,9 +259,9 @@ export function emitRace(race, type, racer, data = {}) {
   chargeFromEvent(race, racer, type, data);
   return event;
 }
-export function launch(race, racer) {
+export function launch(race, racer, airTime = 1.05) {
   if (racer.air > 0) return;
-  racer.air = racer.airTotal = 1.05;
+  racer.air = racer.airTotal = airTime;
   racer.trick = false;
   race.jumps += racer.player ? 1 : 0;
   emitRace(race, 'jump', racer);
@@ -325,12 +326,27 @@ function collect(race, r, p) {
       return void emitRace(race, 'veto', r);
     grantItem(race, r);
   } else if (p.type === 'ramp') launch(race, r);
-  else if (p.type === 'boost') {
+  else if (p.type === 'crest') {
+    // The faster over the top, the longer the flight.
+    if (r.speed > 24) launch(race, r, Math.min(1.5, 0.75 + r.speed / 60));
+  } else if (p.type === 'boost') {
     r.boost = Math.max(r.boost, 1.6);
     emitRace(race, 'boost-pad', r);
   } else if (p.type === 'barrier') hitRacer(r, race, 'barrier');
 }
 
+export function stepCheckpoints(race, r, before) {
+  if (r.routeId || r.finish !== null || !r.item) return;
+  for (const c of race.checkpoints) {
+    const lap = Math.floor(Math.max(0, before) / race.length),
+      at = c.s + lap * race.length;
+    if (before < at && r.s >= at && r.x >= c.x0 && r.x <= c.x1) {
+      const item = r.item;
+      r.item = null;
+      emitRace(race, 'confiscated', r, { item });
+    }
+  }
+}
 export function stepPickups(race, r, before) {
   if (r.routeId || r.finish !== null) return;
   const lapBefore = Math.floor(Math.max(0, before) / race.length),
@@ -524,6 +540,7 @@ export function stepRace(race, dt, input = {}, curve = 0) {
         }
       }
       stepPickups(race, r, before);
+      stepCheckpoints(race, r, before);
     }
     if (!r.routeId) {
       const drafting = race.racers.some(
