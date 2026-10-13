@@ -5,6 +5,7 @@ import { PARTIES, LAPS, ROAD, ranking, sectorAt } from './race-model.js';
 import { ITEMS, ABILITIES } from './race-items.js';
 import { racerFrame } from './kart-routes.js';
 import { icon } from './ui-icons.js';
+import { ROLES as GP_ROLES, standing } from './gp.js';
 
 const $ = id => document.getElementById(id);
 export const formatTime = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
@@ -81,7 +82,12 @@ export function makeHud({ arena, track, reduced, touch }) {
       case 'ram':
         return [`${who} ${e.player ? 'מעיפים' : 'מעיף'} את ${target} מהכביש`, 2];
       case 'leaked':
-        return e.player ? [`הדלפה! ${name(e.from)} הדליף עליכם`, 3] : null;
+        if (!e.player) return null;
+        return e.breaking
+          ? [`מתקפת סייבר! ${name(e.from)} פרץ לכם למסך`, 3]
+          : [`הדלפה! ${name(e.from)} הדליף עליכם`, 3];
+      case 'frozen':
+        return e.player ? [`${name(e.from)} הקפיא לכם ${e.count} פתקים`, 3] : null;
       case 'spun':
         return [`ספין דוקטור: ${e.player ? 'ההגה שלכם הפוך' : 'ההגה של ' + name(e.id) + ' הפוך'}`, 2];
       case 'budget':
@@ -118,7 +124,12 @@ export function makeHud({ arena, track, reduced, touch }) {
       const before = lastOrder.indexOf(me),
         after = order.indexOf(me);
       if (after < before) tick(`עקפתם את ${name(lastOrder[after])} · מקום ${after + 1}`, 2, now);
-      else if (after > before) tick(`${name(order[before])} עוקף אתכם`, 2, now);
+      else if (after > before) {
+        const by = order[before];
+        // A partner ahead of the player gains seats on them in the race for the chair.
+        if (race.coalition.has(by)) tick(`השותפה ${name(by)} עוקפת אתכם — ומתקרבת לכיסא של ראש הממשלה`, 3, now);
+        else tick(`${name(by)} עוקף אתכם`, 2, now);
+      }
       if (order[0] !== lastLeader && lastLeader !== null)
         tick(order[0] === me ? 'אתם מובילים את המרוץ' : `${name(order[0])} עולה למקום הראשון`, 2, now);
     }
@@ -206,7 +217,7 @@ export function makeHud({ arena, track, reduced, touch }) {
       .join('');
     if (gp) {
       $('coalitionMeter').classList.remove('hidden');
-      $('coalitionMeter').textContent = `קואליציה ${coalitionSeats}/61`;
+      $('coalitionMeter').textContent = `קואליציה ${coalitionSeats}/61${gp.coalition.length ? ' · ' + GP_ROLES[standing(gp).role].short : ''}`;
     }
 
     // Item tile.

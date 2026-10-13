@@ -622,6 +622,25 @@
   }
 }
 
+/* Narrow phones: eight portraits share the row, so they shrink with the screen and drop their
+   names (the chosen leader's name is already the big heading above). */
+@media (max-width: 480px) {
+  .drivers {
+    gap: clamp(3px, 1.2vw, 7px);
+  }
+  .driver-photo {
+    width: clamp(28px, calc((100vw - 120px) / 8), 44px);
+    height: clamp(28px, calc((100vw - 120px) / 8), 44px);
+  }
+  .driver[aria-checked='true'] .driver-photo {
+    width: clamp(40px, calc((100vw - 120px) / 8 + 14px), 60px);
+    height: clamp(40px, calc((100vw - 120px) / 8 + 14px), 60px);
+  }
+  .driver-name {
+    display: none;
+  }
+}
+
 /* ——— Landscape phones: logo top, everything else in one compact band ——— */
 @media (pointer: coarse) and (max-height: 520px) and (min-width: 600px) {
   .logo-top {

@@ -8,7 +8,8 @@ import {
   useItem,
   useAbility,
   PACE,
-  CATCH_UP
+  CATCH_UP,
+  PARTIES
 } from '../dist/race-model.js';
 if (process.env.PACE) Object.assign(PACE, JSON.parse(process.env.PACE));
 if (process.env.CATCH) Object.assign(CATCH_UP, JSON.parse(process.env.CATCH));
@@ -28,7 +29,7 @@ for (const level of LEVELS) {
     hits = {},
     events = {};
   for (let run = 0; run < runs; run++) {
-    const race = makeRace(run % 6, level.difficulty, 1000 + run, track.length, track.shortcuts, level.id, {
+    const race = makeRace(run % PARTIES.length, level.difficulty, 1000 + run, track.length, track.shortcuts, level.id, {
       bend: s => track.bend(s)
     });
     const p = race.racers[0];

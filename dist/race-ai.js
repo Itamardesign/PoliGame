@@ -2,6 +2,7 @@
 // simulated by the same physics, so rivals obey the same rules: corners push them wide, hazards
 // spin them, drifts charge boosts and ballots raise their top speed.
 import { encountersFor, encounterAt } from './race-course.js';
+import { emitRace } from './race-model.js';
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const EDGE = 8.4;
@@ -43,7 +44,9 @@ export const PERSONALITIES = [
     risk: 0.2,
     patience: 0.4
   },
-  { id: 'hothead', line: 0.8, drift: 3, aggression: 1, block: 0.4, greed: 0.4, risk: 0.4, patience: 0.1 }
+  { id: 'hothead', line: 0.8, drift: 3, aggression: 1, block: 0.4, greed: 0.4, risk: 0.4, patience: 0.1 },
+  { id: 'general', line: 0.95, drift: 3, aggression: 0.35, block: 0.6, greed: 0.35, risk: 0.1, patience: 0.8 },
+  { id: 'treasurer', line: 0.83, drift: 2, aggression: 0.5, block: 0.45, greed: 0.9, risk: 0.25, patience: 0.4 }
 ];
 
 // Difficulty scales awareness and drift quality on top of each temperament.
@@ -192,8 +195,14 @@ function chooseLine(race, r, dt) {
       player.s - r.s < 18 &&
       o.s < player.s &&
       o.s > r.s - 10
-    )
+    ) {
       x += (o.x - x) * 0.6;
+      // Tell the player when the cover actually holds a chaser up, at most every few seconds.
+      if (o.s < r.s && r.s - o.s < 6 && Math.abs(o.x - r.x) < 1.6 && race.time > (brain.coverAt ?? 0)) {
+        brain.coverAt = race.time + 9;
+        emitRace(race, 'cover', r, { target: o.id });
+      }
+    }
   }
 
   // Occasional lapses keep the pack from looking robotic; a leaked headline over the windscreen
@@ -327,6 +336,11 @@ function decideAbility(race, r) {
       return r.coins < 6;
     case 5:
       return near(2, 35);
+    case 6:
+      return rank > 3 || Math.abs(bendAhead(race, r, 0, 40, 10)) < 0.01;
+    case 7:
+      return race.racers.filter(o => o !== r && o.finish === null && o.coins >= 2 && Math.abs(o.s - r.s) < 70)
+        .length >= 2;
     default:
       return true;
   }

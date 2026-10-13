@@ -994,7 +994,7 @@ svg {
   border-radius: 6px;
   padding: 3px 4px;
 }
-.offer .who b {
+.offer .who > b {
   display: block;
   font-weight: 800;
 }
@@ -1014,6 +1014,88 @@ svg {
 }
 .offer .seats {
   font-weight: 900;
+}
+.offer.blocked {
+  opacity: 0.62;
+}
+.offer[data-preview]:not([data-preview='']) {
+  cursor: default;
+}
+.offer[data-preview]:not([data-preview='']):hover,
+.offer[data-preview]:not([data-preview='']):focus-within {
+  background: rgb(255 255 255 / 0.08);
+}
+.offer .who .gain {
+  color: var(--text);
+}
+.offer .who .gain.majority b {
+  color: var(--green);
+}
+.offer .who .warn {
+  color: #ff9a8f;
+  font-weight: 700;
+}
+.offer .who .contract {
+  color: #8fe0b6;
+}
+.offer .tier {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  vertical-align: 1px;
+}
+.offer .tier.t0 {
+  background: rgb(76 195 138 / 0.2);
+  color: #8fe0b6;
+}
+.offer .tier.t1 {
+  background: rgb(242 193 78 / 0.2);
+  color: var(--gold);
+}
+.offer .tier.t2 {
+  background: rgb(229 56 59 / 0.25);
+  color: #ff9a8f;
+}
+.talks-rules {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.talks-rules li {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.04);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.talks-rules b {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+}
+.chamber-sum.preview b {
+  color: var(--gold);
+}
+.chamber-sum.preview.majority b {
+  color: var(--green);
+}
+.chamber circle.ghost {
+  animation: ghost-seat 1s ease-in-out infinite alternate;
+}
+@keyframes ghost-seat {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .offer button {
   min-height: 38px;
@@ -1055,6 +1137,134 @@ svg {
   background: var(--party);
 }
 .final-parties li b {
+  font-weight: 900;
+}
+
+/* Who holds the chair: a pill under the chamber. */
+.role-pill {
+  justify-self: center;
+  text-align: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  background: rgb(255 255 255 / 0.06);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.role-pill:empty {
+  display: none;
+}
+.role-pill.r-pm,
+.role-pill.r-rotation-first {
+  background: rgb(242 193 78 / 0.16);
+  box-shadow: inset 0 0 0 1px rgb(242 193 78 / 0.6);
+  color: var(--gold);
+}
+.role-pill.r-rotation-second,
+.role-pill.r-finance,
+.role-pill.r-defense {
+  background: rgb(127 233 255 / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(127 233 255 / 0.45);
+  color: #a9eeff;
+}
+
+/* Final count: the government and the ladder beside the chamber. */
+.final-body {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(300px, 1.1fr);
+  gap: 24px;
+  align-items: start;
+  text-align: start;
+}
+.final-gov h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.final-gov h3 + .cabinet + h3 {
+  margin-top: 16px;
+}
+.final-seats {
+  display: grid;
+  gap: 12px;
+}
+.cabinet {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.cabinet li {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  grid-template-rows: auto auto auto;
+  column-gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.04);
+  box-shadow: inset 4px 0 0 var(--party), inset 0 0 0 1px var(--line);
+}
+.cabinet li.me {
+  background: rgb(242 193 78 / 0.1);
+  box-shadow: inset 4px 0 0 var(--party), inset 0 0 0 2px var(--gold);
+}
+.cabinet img,
+.cabinet .noface {
+  grid-row: 1 / 4;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--party);
+}
+.cabinet .job {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--gold);
+}
+.cabinet li.c-finance .job,
+.cabinet li.c-defense .job {
+  color: #a9eeff;
+}
+.cabinet b {
+  font-weight: 900;
+}
+.cabinet small {
+  font-size: 13px;
+  color: var(--muted);
+}
+.ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.ladder li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  background: rgb(255 255 255 / 0.03);
+}
+.ladder li.above {
+  opacity: 0.55;
+}
+.ladder li.here {
+  color: var(--text);
+  background: rgb(242 193 78 / 0.16);
+  box-shadow: inset 0 0 0 2px var(--gold);
+}
+.ladder em {
+  font-style: normal;
+  color: var(--gold);
   font-weight: 900;
 }
 
@@ -1229,6 +1439,20 @@ dialog#info kbd {
   }
   .talks-body {
     grid-template-columns: 1fr;
+  }
+  .final-body {
+    grid-template-columns: 1fr;
+  }
+  .talks-rules {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .talks-rules li {
+    padding: 6px 10px;
+  }
+  .talks-rules b {
+    display: inline;
+    margin-inline-end: 6px;
   }
   .talks-chamber {
     position: static;

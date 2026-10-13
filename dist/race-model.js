@@ -38,18 +38,18 @@ export const PARTIES = [
     logo: 'likud.png'
   },
   {
-    id: 'yesh',
-    name: 'יש עתיד',
-    leader: 'יאיר לפיד',
-    short: 'לפיד',
-    ride: 'עתיד GT',
-    tag: 'יש עתיד. יש גם ניטרו.',
-    color: '#22bddd',
-    accent: '#d3f6ff',
-    hair: '#b8c0c5',
-    skin: '#eabe9e',
+    id: 'together',
+    name: 'ביחד',
+    leader: 'נפתלי בנט',
+    short: 'בנט',
+    ride: 'אקזיט GT',
+    tag: 'שישה מנדטים הספיקו פעם. עכשיו עם טורבו.',
+    color: '#2fbfb8',
+    accent: '#c9f5f1',
+    hair: '#6e5945',
+    skin: '#eabb9b',
     style: 'sport',
-    logo: 'yesh.svg'
+    logo: 'together.png'
   },
   {
     id: 'democrats',
@@ -106,6 +106,34 @@ export const PARTIES = [
     skin: '#ebbe96',
     style: 'offroad',
     logo: 'otzma.png'
+  },
+  {
+    id: 'yashar',
+    name: 'ישר!',
+    leader: 'גדי איזנקוט',
+    short: 'איזנקוט',
+    ride: 'ג׳יפ המטכ״ל',
+    tag: 'קו ישר. בלי פיתולים.',
+    color: '#58b4f0',
+    accent: '#d4ecff',
+    hair: '#b8b6b2',
+    skin: '#e2a890',
+    style: 'command',
+    logo: 'yashar.png'
+  },
+  {
+    id: 'rz',
+    name: 'הציונות הדתית',
+    leader: 'בצלאל סמוטריץ׳',
+    short: 'סמוטריץ׳',
+    ride: 'טרקטור האוצר',
+    tag: 'שר האוצר מחזיק את ההגה. ואת הארנק.',
+    color: '#e3bd3a',
+    accent: '#fff0b0',
+    hair: '#4a3a2c',
+    skin: '#dca286',
+    style: 'tractor',
+    logo: 'rz.png'
   }
 ];
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -148,7 +176,7 @@ export function makeRace(
   options = {}
 ) {
   const random = rng(seed);
-  // A time trial races alone; everything else runs the full field of six.
+  // A time trial races alone; everything else runs the full field of eight.
   const order = options.solo ? [party] : [party, ...PARTIES.map((_, i) => i).filter(i => i !== party)];
   const bend = options.bend ?? (() => 0);
   const race = {
@@ -220,10 +248,11 @@ export function makeRace(
       brain: i === 0 ? null : makeBrain(id, random)
     }))
   };
-  if (race.handicap.grid) {
-    // The player gives up pole: swap grid slots with the last car.
+  const slot = Math.min(race.handicap.gridSlot ?? 0, race.racers.length - 1);
+  if (slot > 0) {
+    // The player gives up pole: swap grid slots with the car on the slot the demand names.
     const p = race.racers[0],
-      last = race.racers.at(-1);
+      last = race.racers[slot];
     [p.s, last.s] = [last.s, p.s];
     [p.prevS, last.prevS] = [last.prevS, p.prevS];
     [p.x, last.x] = [last.x, p.x];
@@ -296,12 +325,15 @@ export function loseBallots(race, racer, count = 3) {
 export function startRace(race, playerLaunch = false) {
   for (const r of race.racers) {
     const good = r.player
-      ? playerLaunch && !race.handicap.noLaunch
+      ? playerLaunch
       : race.random() < { normal: 0.35, hard: 0.55, insane: 0.75 }[race.difficulty] * r.skill;
-    if (good) {
-      r.boost = Math.max(r.boost, 1.9);
-      emitRace(race, 'launch-boost', r);
-    }
+    if (!good) continue;
+    // A rotation agreement weakens or cancels the player's launch.
+    const scale = r.player ? (race.handicap.launchScale ?? 1) : 1;
+    if (scale > 0) {
+      r.boost = Math.max(r.boost, 1.9 * scale);
+      emitRace(race, 'launch-boost', r, scale < 1 ? { weak: true, by: race.handicap.owners?.launch } : {});
+    } else emitRace(race, 'launch-blocked', r, { by: race.handicap.owners?.launch });
   }
 }
 // Distance-based finish estimate for drivers still on track when the player crosses the line.
@@ -323,7 +355,7 @@ function collect(race, r, p) {
     p.hiddenUntil = race.time + RESPAWN.box;
     // A partner's veto: every few boxes the player opens come up empty.
     if (r.player && race.handicap.vetoEvery && ++race.boxes % race.handicap.vetoEvery === 0)
-      return void emitRace(race, 'veto', r);
+      return void emitRace(race, 'veto', r, { by: race.handicap.owners?.veto });
     grantItem(race, r);
   } else if (p.type === 'ramp') launch(race, r);
   else if (p.type === 'crest') {

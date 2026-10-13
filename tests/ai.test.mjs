@@ -60,5 +60,5 @@ test('finished rivals keep rolling and racers past the line stay ranked by finis
   const { r } = race('insane', 9);
   const finished = r.racers.filter(x => !x.player && x.finish !== null);
   for (const x of finished) assert.ok(x.s >= r.length * LAPS);
-  assert.ok(PERSONALITIES.length === 6);
+  assert.ok(PERSONALITIES.length === 8);
 });

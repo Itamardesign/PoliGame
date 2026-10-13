@@ -11,9 +11,10 @@ import {
   coastRace
 } from './race-model.js';
 import { layoutPickups } from './race-course.js';
-import { ABILITIES, useAbility } from './race-items.js';
+import { ABILITIES, ITEMS, useAbility } from './race-items.js';
 import {
   makeKart,
+  setAllyTag,
   loadLogos,
   makeTrack,
   buildWorld,
@@ -33,6 +34,7 @@ import { KEY_ACTIONS, readControls } from './kart-input.js';
 import { levelById } from './kart-levels.js';
 import { makeHud, formatTime } from './kart-hud.js';
 import { makeAudio } from './kart-audio.js';
+import { TAUNTS } from './kart-taunts.js';
 import { makeTouchControls } from './kart-touch.js';
 import { MOODS, VIADUCT } from './world-set.js';
 import { inTunnel, ELECTION_DAY } from './world-news.js';
@@ -44,6 +46,7 @@ import {
   renderResults,
   renderTalks,
   renderFinal,
+  roleText,
   helpHTML,
   CREDITS_HTML
 } from './kart-menus.js';
@@ -130,7 +133,7 @@ let selected = clamp(Number(stored('ck-driver', '0')) || 0, 0, PARTIES.length - 
   toastUntil = 0,
   feedbackUntil = 0,
   sound = stored('ck-sound', 'off') === 'on',
-  previousRank = 6,
+  previousRank = PARTIES.length,
   confetti = [],
   seenEvent = 0,
   launchPressed = 99,
@@ -181,10 +184,24 @@ function setSound(on) {
   cue('ui-click', 600, 0.14);
 }
 const pulse = (pattern = 16) => touchDevice() && navigator.vibrate?.(pattern);
-function toast(message) {
+function toast(message, seconds = 2.2) {
   $('toast').textContent = message;
   $('toast').classList.add('visible');
-  toastUntil = elapsed + 2.2;
+  toastUntil = elapsed + seconds;
+}
+// The cynical announcer on a rival's move: a toast, and the recorded line if voice is on. Hits,
+// thefts and rams cut in; overtakes wait for a gap. At most one every few seconds.
+const ATTACKS = ['hit', 'drop-hit', 'leaked', 'spun', 'cleared'];
+let tauntAt = -99;
+// Which partner demands have already been pointed out this race (each is named once).
+let dealNoticed = {};
+function taunt(rival, kind) {
+  const lines = TAUNTS[rival]?.[kind];
+  if (!lines || rival === selected || elapsed - tauntAt < 4) return;
+  const line = lines[(Math.random() * lines.length) | 0];
+  tauntAt = elapsed;
+  toast(line, 3.6);
+  audio.say(line, { important: false, polite: kind === 'pass' || kind === 'beaten' });
 }
 function callout(text, kind = '') {
   $('feedback').textContent = text;
@@ -485,6 +502,7 @@ function startRace_() {
   seenEvent = 0;
   launchPressed = 99;
   playerHits = {};
+  dealNoticed = {};
   lastLap = 0;
   const inGp = mode === 'gp' && gp && !gp.done;
   race = makeRace(selected, level.difficulty, Date.now(), track.length, track.shortcuts, level.id, {
@@ -494,13 +512,14 @@ function startRace_() {
     ...(inGp ? GP.raceOptions(gp) : {})
   });
   karts.forEach((k, i) => (k.visible = race.racers.some(r => r.id === i)));
+  karts.forEach((k, i) => setAllyTag(k, i !== selected && race.coalition.has(i)));
   $('fieldSize').textContent = '/' + race.racers.length;
   karts.forEach(resetMotion);
   karts.forEach(k => k.scale.setScalar(1));
   state = reduced ? 'countdown' : 'intro';
   introT = 0;
   count = 3.5;
-  previousRank = 6;
+  previousRank = PARTIES.length;
   pickups.forEach(p => (p.visible = true));
   confetti.forEach(p => scene.remove(p.mesh));
   confetti = [];
@@ -520,9 +539,12 @@ function startRace_() {
       ? `${level.name} · מרוץ ${gp.round + 1} מתוך ${GP.GP_RACES.length}`
       : `${level.name} · ${level.speed}`
   );
-  if (inGp && race.handicap) {
-    const asks = gp.coalition.map(id => GP.DEMANDS[GP.ASKS[id]].name);
-    if (asks.length) hud.tick('דרישות השותפים בתוקף: ' + asks.join(', '), 3, 0);
+  if (inGp) {
+    for (const id of gp.coalition) {
+      const d = GP.demandOf(gp, id);
+      hud.tick(`${PARTIES[id].name} בקואליציה: ${d.name} — ${d.cost}`, 3, 0);
+    }
+    if (gp.coalition.length) hud.tick(roleText(gp) + ' · כל מקום במרוץ שווה מנדטים', 2, 0);
   }
   pulse(28);
   canvas.focus({ preventScroll: true });
@@ -609,10 +631,14 @@ const PLAYER_CALLOUTS = {
   leaked: ['הדלפה! לא רואים כלום', 'danger'],
   spun: ['ההגה הפוך', 'danger'],
   cleared: ['פינו אתכם מהדרך', 'danger'],
+  frozen: ['הקפאת תקציבים: הפתקים שלכם הוחרמו', 'danger'],
   'ability-ready': [null, 'gold'],
   warp: ['התפטרתם… וחזרתם קדימה', 'gold'],
-  veto: ['וטו של השותפים: הקלפי ריקה', 'danger']
+  veto: ['וטו של השותפים: הקלפי ריקה', 'danger'],
+  'launch-blocked': ['הסכם רוטציה: בלי זינוק טורבו', 'danger']
 };
+// The partner behind a handicap, for callouts that name who did it.
+const partnerName = id => (id === undefined || id === null ? 'השותפים' : PARTIES[id].name);
 function consumeEvents() {
   for (const e of race.events) {
     if (e.seq <= seenEvent) continue;
@@ -633,8 +659,13 @@ function consumeEvents() {
     const fromMe = e.from === selected || (e.type === 'ram' && e.player);
     if (fromMe) {
       const victim = e.type === 'ram' ? e.target : e.id;
-      if (['hit', 'ram', 'leaked', 'spun', 'drop-hit'].includes(e.type) && victim !== selected)
+      if (['hit', 'ram', 'leaked', 'spun', 'drop-hit', 'frozen'].includes(e.type) && victim !== selected) {
         playerHits[victim] = (playerHits[victim] ?? 0) + 1;
+        if (race.coalition.has(victim)) {
+          callout(`פגעתם בשותפה · הנאמנות של ${PARTIES[victim].name} יורדת`, 'danger');
+          cue('coalition-reject', 300, 0.15);
+        }
+      }
     }
     if ((e.type === 'noconf-fired' || e.type === 'poll-fired') && e.target === selected) {
       const line = e.type === 'noconf-fired' ? 'הצבעת אי־אמון נגדכם' : 'סקר בדרך אליכם';
@@ -644,14 +675,26 @@ function consumeEvents() {
     }
     if ((e.type === 'ram' || e.type === 'bump') && (e.player || e.target === selected))
       cue('bump', 160, 0.12, 'square');
+    // The announcer names whoever did it.
+    if (e.player && ATTACKS.includes(e.type) && e.from !== undefined) taunt(e.from, 'attack');
+    if (e.type === 'budget' && e.target === selected) taunt(e.id, 'steal');
+    if (e.type === 'frozen' && e.player) taunt(e.from, 'steal');
+    if (e.type === 'ram' && e.target === selected) taunt(e.id, 'ram');
+    if (e.type === 'cover') toast(`${PARTIES[e.id].short} חוסם את ${PARTIES[e.target].short} בשבילכם`, 1.8);
     if (!e.player) continue;
     const c = PLAYER_CALLOUTS[e.type];
     if (c) {
       callout(
         e.type === 'ability-ready'
           ? `${ABILITIES[selected].name} מוכנה · ${touchDevice() ? 'הקישו על הפנים' : 'E'}`
-          : c[0],
-        c[1]
+          : e.type === 'veto'
+            ? `וטו של ${partnerName(e.by)}: הקלפי ריקה`
+            : e.type === 'launch-blocked'
+              ? `הסכם רוטציה עם ${partnerName(e.by)}: בלי זינוק טורבו`
+              : e.type === 'launch-boost' && e.weak
+                ? `זינוק מוחלש · הסכם רוטציה עם ${partnerName(e.by)}`
+                : c[0],
+        e.type === 'launch-boost' && e.weak ? 'danger' : c[1]
       );
       const named = {
         'ability-ready': 'ability-ready',
@@ -663,7 +706,9 @@ function consumeEvents() {
         spun: 'spin',
         warp: 'warp',
         veto: 'veto',
-        cleared: 'hit'
+        'launch-blocked': 'veto',
+        cleared: 'hit',
+        frozen: 'budget'
       }[e.type];
       if (named) cue(named, e.type === 'ability-ready' ? 980 : 750, 0.18);
       else tone(e.type === 'ability-ready' ? 980 : 750, 0.18);
@@ -687,6 +732,17 @@ function consumeEvents() {
     if (e.type === 'item-get') {
       cue('item-get', 570, 0.12);
       pulse(40);
+    }
+    if (e.type === 'item-banned')
+      toast(`${partnerName(e.by)} מחזיקים בתיק: ${ITEMS[e.item].name} הוחלף בטורבו`, 2.6);
+    const h = race.handicap;
+    if (e.type === 'pickup' && h.ballotCap < 10 && e.count >= h.ballotCap && !dealNoticed.cap) {
+      dealNoticed.cap = true;
+      toast(`כספים קואליציוניים של ${partnerName(h.owners.cap)}: רק ${h.ballotCap} פתקים מוסיפים מהירות`, 2.8);
+    }
+    if (e.type === 'drift-boost' && h.driftScale < 1 && !dealNoticed.drift) {
+      dealNoticed.drift = true;
+      toast(`ועדת החקירה של ${partnerName(h.owners.drift)} מקצרת לכם את הבוסט`, 2.6);
     }
     if (e.type === 'item-use') cue(ITEM_SOUNDS[e.item], e.item === 'boost' ? 880 : 550, 0.2);
     if (e.type === 'hit') {
@@ -827,7 +883,7 @@ function showFinal() {
   state = 'final';
   for (const id of ['results', 'hud', 'touch', 'talks']) $(id).classList.add('hidden');
   $('final').classList.remove('hidden');
-  const v = renderFinal(gp);
+  const v = renderFinal(gp, faceImages);
   cue(v.formed ? 'gov-formed' : 'gov-failed', v.formed ? 1200 : 220, 0.6);
   audio.say(v.formed ? 'הממשלה הוקמה' : 'אין ממשלה');
   $('newSeason').focus({ preventScroll: true });
@@ -848,8 +904,12 @@ function updateKarts(dt) {
     kart.visible = true;
     // Name tags only at mid range: close karts are obvious, distant ones would be noise.
     const range = kart.position.distanceTo(camera.position);
+    // Partners stay tagged further out, so the player can tell who is on their side.
     kart.userData.name.visible =
-      !r.player && (state === 'running' || state === 'countdown') && range > 9 && range < 70;
+      !r.player &&
+      (state === 'running' || state === 'countdown') &&
+      range > 9 &&
+      range < (race.coalition.has(r.id) ? 120 : 70);
     kart.userData.name.quaternion.copy(camera.quaternion).premultiply(kart.quaternion.clone().invert());
   }
 }
@@ -866,7 +926,7 @@ function setCamera(snap = false, dt = 1 / 60) {
       const k = karts[i];
       k.visible = true;
       k.scale.setScalar(i === selected ? 1.6 : 0.9);
-      const data = track.at(i === selected ? 8 : 22 + (i % 3) * 6, i === selected ? 0 : i % 2 ? 4 : -4);
+      const data = track.at(i === selected ? 8 : 20 + (Math.floor(i / 2) % 4) * 5.5, i === selected ? 0 : i % 2 ? 4 : -4);
       k.position.copy(data.p);
       k.rotation.set(0, Math.atan2(data.t.x, data.t.z) + Math.PI, 0);
       k.userData.body.rotation.set(0, 0, 0);
@@ -990,9 +1050,12 @@ function updateHUD() {
     if (position === 1) {
       callout('מקום ראשון', 'gold');
       audio.say('מקום ראשון');
-    }
+    } else taunt(ranking(race)[position].id, 'beaten');
     pulse(position === 1 ? [30, 45, 40] : 24);
   }
+  // Dropped a place: the kart now just ahead is the one that went by.
+  if (position > previousRank && race.time > 4 && state === 'running')
+    taunt(ranking(race)[position - 2].id, 'pass');
   previousRank = position;
 }
 

@@ -31,28 +31,29 @@ const LOOKS = [
     body: { suit: '#161b2c', shirt: '#f4f6f9', tie: '#1f6fe0', w: 1.05, pin: true }
   },
   {
-    id: 'lapid',
-    W: 0.98,
-    L: 1.04,
-    skin: '#d9a081',
-    lip: '#bb7a6e',
-    eye: '#687f8c',
+    id: 'bennett',
+    W: 1.04,
+    L: 1.02,
+    skin: '#e4b58e',
+    lip: '#c9877a',
+    eye: '#5a3d26',
     eyeR: 0.108,
-    lid: 0.18,
-    lidTilt: 0.05,
-    brow: '#4a4d52',
-    browT: 0.048,
-    browY: [0.21, 0.23, 0.2],
-    nose: { l: 1, w: 0.95, tip: 0.95 },
-    jaw: { w: 0.66, chin: 0.27, chinY: -0.01, square: true },
-    cheek: 0.85,
-    mouth: { w: 1.15, smile: 0.04, asym: 0, teeth: true },
+    lid: 0.2,
+    lidTilt: 0,
+    brow: '#5e4a3a',
+    browT: 0.04,
+    browY: [0.21, 0.23, 0.21],
+    nose: { l: 1, w: 1.05, tip: 1.05 },
+    jaw: { w: 0.7, chin: 0.25, chinY: 0, square: true },
+    cheek: 1.05,
+    mouth: { w: 1.05, smile: 0.03, asym: 0, thin: true },
     wrinkles: 0,
-    folds: true,
-    hair: '#c9cdd1',
-    hairDark: '#8c9298',
-    hairStyle: 'volume',
-    body: { suit: '#15181d', shirt: '#c9daf0', tie: '#1c3f4a', w: 1, pin: true }
+    folds: false,
+    hair: '#6e5945',
+    hairDark: '#4a3b2e',
+    hairStyle: 'bald',
+    kippah: 'small',
+    body: { suit: '#1b1c1f', shirt: '#f6f7f9', tie: '#1d2c55', w: 1.02, pin: true }
   },
   {
     id: 'golan',
@@ -156,6 +157,20 @@ const LOOKS = [
     glasses: 'round',
     kippah: 'knit',
     body: { suit: '#1d2c4f', shirt: '#f7f8fb', tie: '#2b4ea0', w: 1.12 }
+  },
+  {
+    id: 'eisenkot',
+    skin: '#d9a08a',
+    hairStyle: 'cropped',
+    // Open collar, no tie, as in his campaign portraits.
+    body: { suit: '#1d2a4a', shirt: '#f4f6f8', w: 1.1, open: true, pin: true }
+  },
+  {
+    id: 'smotrich',
+    skin: '#d39a7e',
+    hairStyle: 'dark',
+    kippah: 'small',
+    body: { suit: '#25272c', shirt: '#f6f7f9', tie: '#c8262c', w: 1.04 }
   }
 ];
 function bodyOps(c) {
@@ -352,13 +367,19 @@ function headShape(id) {
   return { base: make(1), shell: make(1.006), Hw, Hh, D, ey };
 }
 function kippah(head, kind, s) {
-  const theta = Math.PI * (kind === 'velvet' ? 0.19 : 0.2),
+  const theta = Math.PI * (kind === 'velvet' ? 0.19 : kind === 'small' ? 0.13 : 0.2),
     geo = new T.SphereGeometry(1, 40, 10, 0, Math.PI * 2, 0, theta),
     p = geo.getAttribute('position'),
     col = [];
   const bands =
     kind === 'velvet'
       ? [[1, '#121316']]
+      : kind === 'small'
+      ? [
+          [0.55, '#3d342c'],
+          [0.68, '#5a4c40'],
+          [1, '#3d342c']
+        ]
       : [
           [0.5, '#f3f1eb'],
           [0.58, '#d8d5cb'],
@@ -380,7 +401,7 @@ function kippah(head, kind, s) {
       side: T.DoubleSide
     })
   );
-  m.rotation.x = kind === 'velvet' ? -0.62 : -0.12;
+  m.rotation.x = kind === 'velvet' ? -0.62 : kind === 'small' ? -0.45 : -0.12;
   m.castShadow = true;
   head.add(m);
 }

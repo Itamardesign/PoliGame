@@ -379,9 +379,11 @@ export function makeAudio() {
     },
     // Short Hebrew lines for the big moments: the recorded announcer, else the browser's Hebrew voice
     // (only for lines marked important, so a robot voice doesn't chatter over every trick).
-    say(text, { important = true } = {}) {
+    // A polite line waits its turn: it is dropped rather than cutting off one already playing.
+    say(text, { important = true, polite = false } = {}) {
       if (!enabled || !voiceOn) return;
       const clip = clips[text];
+      if (clip && polite && speaking) return;
       if (clip && ensure()) {
         speaking?.stop();
         const src = ctx.createBufferSource(),

@@ -1,5 +1,6 @@
 // Plays whole "Race to 61" seasons headlessly: node tools/gp-sim.mjs [skilled|casual] [seasons] [strategy]
-// strategy: greedy (invite the biggest parties) | lean (one partner at a time) | solo (no partners)
+// strategy: greedy (invite the biggest parties) | smart (the partners that add most seats, vetoes
+// considered) | lean (one partner) | solo (no partners)
 import { makeRace, stepRace, ranking, startRace, useItem, useAbility } from '../dist/race-model.js';
 import { makeBrain, aiInput } from '../dist/race-ai.js';
 import { stepEncounters, bumpRivals } from '../dist/kart-encounters.js';
@@ -7,6 +8,7 @@ import { makeTrack } from '../dist/kart-world.js';
 import { makeShortcuts, routeBend } from '../dist/kart-routes.js';
 import { levelById } from '../dist/kart-levels.js';
 import * as GP from '../dist/gp.js';
+import { PARTIES } from '../dist/race-model.js';
 
 const mode = process.argv[2] ?? 'skilled',
   seasons = Number(process.argv[3] ?? 6),
@@ -56,13 +58,13 @@ function runRace(party, levelId, seed, options) {
   return {
     order: ranking(race).map(r => r.id),
     hits,
-    votes: [0, 1, 2, 3, 4, 5].map(id => race.racers.find(r => r.id === id).votes)
+    votes: PARTIES.map((_, id) => race.racers.find(r => r.id === id).votes)
   };
 }
 const outcomes = {},
   seatsList = [];
 for (let n = 0; n < seasons; n++) {
-  const party = n % 6,
+  const party = n % PARTIES.length,
     gp = GP.newGrandPrix(party);
   while (!gp.done) {
     const level = GP.currentLevel(gp);
@@ -70,14 +72,30 @@ for (let n = 0; n < seasons; n++) {
     GP.awardSeats(gp, order, hits, votes);
     if (gp.done) break;
     GP.defections(gp);
-    const want = strategy === 'solo' ? 0 : strategy === 'lean' ? 1 : 2;
-    for (const offer of GP.offers(gp)
-      .filter(o => o.willing)
-      .slice(0, want))
-      GP.invite(gp, offer.id);
+    const want = strategy === 'solo' ? 0 : strategy === 'lean' ? 1 : GP.MAX_PARTNERS;
+    if (strategy === 'smart') {
+      // Start over and take the compatible set of partners (up to the cap) that adds the most seats.
+      gp.coalition = [];
+      const open = GP.offers(gp).filter(o => o.willing).map(o => o.id),
+        sum = ids => ids.reduce((t, id) => t + gp.seats[id], 0);
+      let best = [];
+      for (let mask = 1; mask < 1 << open.length; mask++) {
+        const pick = open.filter((_, i) => mask & (1 << i));
+        if (pick.length > GP.MAX_PARTNERS) continue;
+        if (pick.some((a, i) => pick.slice(i + 1).some(b => GP.vetoed(a, b)))) continue;
+        if (sum(pick) > sum(best)) best = pick;
+      }
+      for (const id of best) GP.invite(gp, id);
+      continue;
+    }
+    // Offers change with every invitation (vetoes), so ask again each time.
+    while (gp.coalition.length < want) {
+      const offer = GP.offers(gp).find(o => o.willing);
+      if (!offer || !GP.invite(gp, offer.id)) break;
+    }
   }
   const v = GP.verdict(gp);
-  outcomes[v.outcome] = (outcomes[v.outcome] ?? 0) + 1;
+  outcomes[v.role] = (outcomes[v.role] ?? 0) + 1;
   seatsList.push(`${v.seats}(${gp.coalition.length + 1}p,${gp.left.length}out)`);
 }
 console.log(mode, strategy, JSON.stringify(outcomes), seatsList.join(' '));

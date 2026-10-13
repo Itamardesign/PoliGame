@@ -33,7 +33,7 @@ test('steering can overcome corners; going idle loses', () => {
     const p = r.racers[0];
     return { steer: Math.max(-1, Math.min(1, (-track.bend(p.s) * p.speed * 3.5) / 11.4 - p.x * 0.6)) };
   });
-  assert.equal(ranking(idle).indexOf(idle.racers[0]) + 1, 6);
+  assert.equal(ranking(idle).indexOf(idle.racers[0]) + 1, 8);
   assert.ok(skilled.time < idle.time * 0.8);
   console.log('Driving balance:', {
     idle: idle.time.toFixed(1),

@@ -7,7 +7,7 @@
     <title>קואליציה קארט</title>
     <meta
       name="description"
-      content="מרוץ קארטינג סאטירי בתלת־ממד: שישה מנהיגים, שלושה מסלולים, 120 מנדטים — ומי שמרכיב 61 מקים ממשלה."
+      content="מרוץ קארטינג סאטירי בתלת־ממד: שמונה מנהיגים, שלושה מסלולים, 120 מנדטים — ומי שמרכיב 61 מקים ממשלה."
     />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" href="./icons/favicon-64.png" />
@@ -324,14 +324,17 @@
           <header class="talks-head">
             <span class="kicker" id="talksKicker"></span>
             <h2>משא ומתן קואליציוני</h2>
-            <p>
-              עד שני שותפים. מפלגה גדולה מכם ביותר מארבעה מנדטים לא תצטרף כשותפה זוטרה, וכל שותף מביא דרישה.
-            </p>
+            <ul class="talks-rules">
+              <li><b>מקבלים</b>המנדטים שלהם נספרים ל־61, והם שומרים לכם על הגב. פגעתם בהם? יפרשו.</li>
+              <li><b>משלמים</b>כל שותף דורש משהו, וככל שהוא גדול יותר הדרישה כבדה יותר.</li>
+              <li><b>הכיסא</b>המפלגה הגדולה בקואליציה מקבלת את ראשות הממשלה. פער של עד 2 מנדטים — רוטציה.</li>
+            </ul>
           </header>
           <div class="talks-body">
             <div class="talks-chamber">
               <div id="talksChamber" class="chamber"></div>
               <div id="talksSum" class="chamber-sum"></div>
+              <div id="talksRole" class="role-pill"></div>
               <div id="talksNotice" class="notice hidden"></div>
             </div>
             <ul id="offers" class="offers"></ul>
@@ -349,8 +352,18 @@
           <span class="kicker">ספירת המנדטים</span>
           <h2 id="finalTitle"></h2>
           <p id="finalLine"></p>
-          <div id="finalChamber" class="chamber large"></div>
-          <ul id="finalParties" class="final-parties"></ul>
+          <div class="final-body">
+            <div class="final-gov">
+              <h3 id="finalGovTitle"></h3>
+              <ul id="finalCabinet" class="cabinet"></ul>
+              <h3>הסולם</h3>
+              <ol id="finalLadder" class="ladder"></ol>
+            </div>
+            <div class="final-seats">
+              <div id="finalChamber" class="chamber large"></div>
+              <ul id="finalParties" class="final-parties"></ul>
+            </div>
+          </div>
           <div class="actions">
             <button id="newSeason" class="primary">עונה חדשה</button>
             <button id="finalHome" class="secondary">לתפריט</button>

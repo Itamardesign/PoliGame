@@ -14,15 +14,15 @@ Import the repository with **Root Directory** `coalition-chaos` if you import th
 
 ## Modes
 
-- **The Race to 61 (המרוץ ל־61).** Three races (Knesset Avenue at 150cc, the reversed city at dusk at 200cc, Jerusalem at night at 250cc) hand out the 120 seats: mostly by finishing place, partly by the ballot slips (votes) each party collects. Between races you may invite up to two partners, but a party will not join as a junior partner if it holds more than four seats more than you. Partners stop targeting you and cover your back on track, and each brings a demand that handicaps you while they stay: starting from the back of the grid, a ballot cap, shorter drift boosts, an empty ballot box every third time, no launch boost, or no no-confidence votes. Hit a partner, or let them outrun you, and their loyalty drops until they walk out. The season ends with the count: a government, an opposition government, or a 60–60 deadlock.
-- **Single race (מרוץ בודד).** Any course, three laps, six drivers.
+- **The Race to 61 (המרוץ ל־61).** Three races (Knesset Avenue at 150cc, the reversed city at dusk at 200cc, Jerusalem at night at 250cc) hand out the 120 seats: mostly by finishing place, partly by the ballot slips (votes) each party collects. Between races you may invite up to three partners. A party will not join as a junior partner if it holds more than four seats more than you, and some parties will not sit together at all (Yisrael Beytenu and Shas, Together and Shas, Together and Otzma, the Democrats and Otzma, Likud and the Democrats, Yashar and Otzma, Yashar and Religious Zionism, the Democrats and Religious Zionism); the vetoes bind you and the rivals alike. Partners stop targeting you and cover your back on track, and each brings a demand that handicaps you while they stay, heavier the bigger they are relative to you: a later grid slot, a ballot cap, shorter drift boosts, empty ballot boxes, a weaker or no launch boost, or banned attack items. The talks screen previews each deal on the chamber, and the race names the partner behind every handicap. Hit a partner and its loyalty drops until it walks out. The biggest party in the government names the prime minister; within two seats, the top two rotate; the rest take finance, defence and justice. The season ends on a ladder: prime minister, rotation first, rotation second, finance, defence, justice, opposition, or new elections, with the government shown on the final screen.
+- **Single race (מרוץ בודד).** Any course, three laps, eight drivers.
 
 ## How it plays
 
 - **Driving.** The kart accelerates by itself; W/↑ adds throttle and S/↓ brakes. Steer with A/D or ←/→; physical key codes are used, so a Hebrew keyboard layout works. Press W exactly as the countdown shows 1 for a launch boost. Hold Shift with a direction to drift; release after blue, orange or purple for stronger boosts. Shift in the air is a trick, which gives a boost on landing. C switches camera; Esc/P pauses. On phones and tablets, drag anywhere on the left of the screen to steer (an analog stick appears under the thumb), steer hard to auto-drift (the drift button fills with the charge and turns into a turbo badge while boosting), tap quickly to use the item; the item and the portrait fire on touch, so they work while steering; tilt and button steering are in the pause menu.
 - **Rivals race on merit.** Each AI driver produces the same inputs a player would and runs through the same physics. They take a racing line, drift through corners, collect ballots and boxes, steer around hazards they can reach in time, draft, block and ram on purpose. Each leader has a temperament (tactician, anchor, charger, wall, collector, hothead). Difficulty scales their awareness, how often they drift and the boost tier they hold for. A gentle catch-up keeps the field within a few seconds.
 - **Items (קלפי).** Ballot boxes hand out items by position: leaders get defence, the back of the pack the heavy ones. Turbo, immunity, a surprise poll (hits the kart ahead), a vote magnet, a press leak (newsprint covers the screens of those ahead), a filibuster (a lectern dropped behind you), a spin doctor (reverses the steering of the kart ahead), a budget transfer (steals ballots) and a no-confidence vote (a gavel that lands on the leader through any shield).
-- **Abilities.** Every leader has a signature move, charged by drifting, tricks, near misses and slipstreams and fired with E or by tapping the portrait: super immunity, breaking news, a protest barricade, resignation (out of the coalition and back in ahead), coalition funds and a siren that clears the road.
+- **Abilities.** Every leader has a signature move, charged by drifting, tricks, near misses and slipstreams and fired with E or by tapping the portrait: super immunity, a cyber attack, a protest barricade, resignation (out of the coalition and back in ahead), coalition funds, a siren that clears the road, a straight-line charge and a budget freeze.
 - **Vehicles differ.** Top speed, pick-up, grip, off-road pace and weight trade off. No vehicle tops every category.
 
 ## The world
@@ -41,7 +41,7 @@ Buildings are Jerusalem limestone with roller blinds, balconies and rooftop sola
 | `race-ai.js` | Rival drivers: racing line, hazard avoidance, racecraft, items, abilities |
 | `race-items.js` | Items, abilities, vehicle stats |
 | `race-course.js` | Pickup and hazard layout shared by simulation and renderer |
-| `gp.js` | The Race to 61 season: seats, talks, demands, loyalty, verdict |
+| `gp.js` | The Race to 61 season: seats, talks, demands and vetoes, loyalty, the cabinet and the verdict |
 | `world-kit.js`, `world-set.js` | Procedural textures and props, and the dressed city |
 | `kart-world.js`, `kart-drivers.js` | Karts and drivers |
 | `kart-motion.js`, `kart-trails.js` | Kart animation, smoke, sparks and dust |
@@ -65,10 +65,12 @@ This is satire. The leaders are caricatures, and the vehicles, abilities, items 
 Retrieved September 23, 2026. Trademarks remain the property of their owners; inclusion does not imply endorsement. Party logos are identifying marks in a satirical game.
 
 - Likud: https://en.wikipedia.org/wiki/Likud — `Likud_Logo.svg` thumbnail, Wikimedia Commons. Leader reference: https://www.likud.org.il/
-- Yesh Atid: https://yeshatid.org.il/wp-content/uploads/2026/03/לוגו-יש-עתיד-1.svg
+- Together (Bennett 2026): https://en.wikipedia.org/wiki/Bennett_2026 — `Bennet2026logo.png`, Wikimedia Commons, public domain (retrieved October 13, 2026)
 - Democrats: https://democrats.org.il/wp-content/uploads/2026/08/logo-desktop.svg — leader: https://democrats.org.il/yair-golan/
 - Yisrael Beytenu: https://beytenu.org.il/wp-content/uploads/2023/07/IB_New-Logo_Dark-4-1024x369.webp
 - Shas: https://en.wikipedia.org/wiki/Shas — `Shas_logo.svg` thumbnail; leader reference https://www.knesset.tv/knesset-members/aryeh-machluf-deri/
+- Yashar!: `Yashar party logo.png`, Wikimedia Commons, public domain (retrieved October 13, 2026)
+- Religious Zionist Party: https://en.wikipedia.org/wiki/Religious_Zionist_Party — `Religious_Zionist_Party_logo_2026.png`, Wikimedia Commons, public domain (retrieved October 13, 2026)
 - Otzma Yehudit: https://en.wikipedia.org/wiki/Otzma_Yehudit — `Otzma_Yehudit_2021_logo.svg` thumbnail; leader reference https://www.ozma-yeudit.co.il/מי-אנחנו/
 - Heebo: Google Fonts, SIL Open Font License. Local font assets are TrueType files served by Google Fonts; `fonts.css` declares their actual format.
 - Three.js: vendored, MIT; `dist/vendor/THREE-LICENSE.txt`.
@@ -76,11 +78,13 @@ Retrieved September 23, 2026. Trademarks remain the property of their owners; in
 Driver portraits (cropped from the originals, stylized, and mapped onto 3D heads; `dist/assets/faces/`, face landmarks in `dist/kart-faces.js`), retrieved September 29, 2026 from Wikimedia Commons:
 
 - Benjamin Netanyahu: `Benjamin_Netanyahu,_February_2023.jpg`, Avi Ohayon, CC BY-SA 3.0
-- Yair Lapid: `Yair_Lapid_(D1237-011).jpg`, Avi Ohayon, CC BY-SA 3.0
+- Naftali Bennett: `Naftali_Bennett_Official_(cropped).jpg`, Avi Ohayon (GPO), CC BY-SA 3.0 (retrieved October 13, 2026)
 - Yair Golan: `Yair_Golan_(SHL_9404).jpg`, Shlomi Amsalem, CC BY-SA 4.0
 - Avigdor Lieberman: `Avigdor_Lieberman_2017.jpg`, U.S. DoD (Jim Mattis visit), public domain
 - Aryeh Deri: `אריה_דרעי_2.jpg`, רווח הפקות, CC BY-SA 3.0
 - Itamar Ben-Gvir: `Itamar_Ben_Gvir_3_(cropped).jpg`, אלון נוריאל, CC BY-SA 3.0
+- Gadi Eisenkot: `Gadi_Eisenkot_2_(cropped1).jpg`, יהב טרודלר (Yahav Trudler – Yahav Studio), CC BY-SA 3.0 (retrieved October 13, 2026)
+- Bezalel Smotrich: `Bezalel_Smotrich_(R_H_4464)_(cropped).jpg`, Ronen Horesh, CC BY-SA 4.0 (retrieved October 13, 2026)
 
 The portraits are repainted in code at load (smoothed, banded into painted tones and inked along strong edges) before being mapped onto the heads; the modified faces are shared under the same CC BY-SA terms. All other 3D geometry, textures, the city, vehicles, animation and music are original procedural work generated in code.
 

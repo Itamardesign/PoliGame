@@ -2,6 +2,7 @@
 // plus manifest.json; the game falls back to its synthesized sound for anything missing.
 // seconds: 0.5–30. variants: several takes, picked at random in game. loop: seamless loop.
 // volume: mix level in game (0–1). influence: how literally the prompt is followed (0–1).
+import { TAUNTS } from '../dist/kart-taunts.js';
 
 export const SFX = {
   // Engine and driving loops. The engine crossfades low → high with revs.
@@ -126,11 +127,13 @@ export const SFX = {
   // Leader abilities.
   'ability-ready': { prompt: 'Power ready notification, bright magical shimmer rising', seconds: 0.8, volume: 0.55 },
   'ability-immunity': { prompt: 'Golden invincibility power-up, epic rising synth swell with a choir hit', seconds: 1.5, volume: 0.65 },
-  'ability-breaking': { prompt: 'TV breaking news sting, short dramatic news jingle with a whoosh', seconds: 2, volume: 0.65 },
+  'ability-breaking': { prompt: 'Cyber attack hacking glitch, digital static burst and an alarm beep', seconds: 2, volume: 0.65 },
   'ability-protest': { prompt: 'Protest crowd chanting with a megaphone and drums, short burst', seconds: 1.5, volume: 0.65 },
   'ability-resign': { prompt: 'Door slam then a magical teleport whoosh', seconds: 1.5, volume: 0.6 },
   'ability-funds': { prompt: 'Shower of coins and banknotes with a cash register and a turbo whoosh', seconds: 1.5, volume: 0.65 },
   'ability-siren': { prompt: 'Police siren wail short burst with a loud horn', seconds: 1.5, volume: 0.65 },
+  'ability-straight': { prompt: 'Military jeep engine roar with a radio chirp and a straight-line turbo whoosh', seconds: 1.5, volume: 0.65 },
+  'ability-treasury': { prompt: 'Heavy vault door slam, ice freezing crackle and coins pouring into a strongbox', seconds: 1.5, volume: 0.65 },
 
   // Laps and results.
   lap: { prompt: 'Racing game lap complete chime with a short crowd cheer', seconds: 1.2, volume: 0.55 },
@@ -171,3 +174,6 @@ export const VOICE = {
   'הממשלה הוקמה': '[excited] הממשלה הוקמה!',
   'אין ממשלה': '[sighs] אין ממשלה. הולכים לבחירות.'
 };
+// The cynical announcer's lines about each rival (appended, so existing files keep their names).
+for (const party of TAUNTS)
+  for (const line of Object.values(party).flat()) VOICE[line] = '[sarcastic] ' + line;

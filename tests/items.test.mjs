@@ -84,8 +84,8 @@ test('a filibuster stops the kart that runs into it', () => {
 });
 
 test('every leader has a distinct ability that only fires when charged', () => {
-  assert.equal(ABILITIES.length, 6);
-  for (let party = 0; party < 6; party++) {
+  assert.equal(ABILITIES.length, 8);
+  for (let party = 0; party < 8; party++) {
     const race = lineup(party),
       p = race.racers[0];
     assert.equal(useAbility(race, p), null);

@@ -20,7 +20,9 @@ const TABLE = [
   { poll: 25, filibuster: 10, leak: 10, boost: 25, shield: 10, budget: 15, magnet: 5 },
   { boost: 33, poll: 20, leak: 12, spin: 15, budget: 10, noconf: 5, magnet: 5 },
   { boost: 32, poll: 15, leak: 15, spin: 15, budget: 10, noconf: 8, magnet: 5 },
-  { boost: 35, noconf: 15, spin: 15, leak: 15, budget: 10, poll: 10 }
+  { boost: 34, poll: 12, leak: 15, spin: 15, budget: 10, noconf: 12, magnet: 2 },
+  { boost: 35, noconf: 15, spin: 15, leak: 15, budget: 10, poll: 10 },
+  { boost: 38, noconf: 17, spin: 13, leak: 14, budget: 10, poll: 8 }
 ];
 
 export function grantItem(race, racer) {
@@ -42,7 +44,11 @@ export function grantItem(race, racer) {
     }
   }
   racer.item ??= 'boost';
-  if (racer.player && racer.item === 'noconf' && race.handicap.noNoconf) racer.item = 'boost';
+  // A partner holding the portfolio takes the weapon away and leaves a turbo instead.
+  if (racer.player && race.handicap.banned?.includes(racer.item)) {
+    emitRace(race, 'item-banned', racer, { item: racer.item, by: race.handicap.owners?.item });
+    racer.item = 'boost';
+  }
   emitRace(race, 'item-get', racer, { item: racer.item });
 }
 
@@ -182,7 +188,10 @@ export const STATS = [
   { top: -0.5, accel: 0.3, grip: 1, offroad: 0.12, weight: 0.8, ballot: 0.2 },
   { top: 0.2, accel: 0.5, grip: -0.7, offroad: 0, weight: 1.2, ballot: 0.2 },
   { top: -0.35, accel: 0, grip: 0.4, offroad: 0, weight: 1, ballot: 0.25 },
-  { top: -0.35, accel: 0.2, grip: -0.2, offroad: 0.22, weight: 1.3, ballot: 0.2 }
+  { top: -0.35, accel: 0.2, grip: -0.2, offroad: 0.22, weight: 1.3, ballot: 0.2 },
+  // A big party in the polls drives a heavy, fast, wide-turning car; a small one a light, nimble one.
+  { top: 0.6, accel: -0.3, grip: -0.3, offroad: 0.05, weight: 1.3, ballot: 0.2 },
+  { top: -0.5, accel: 0.55, grip: 0.35, offroad: 0.25, weight: 0.85, ballot: 0.22 }
 ];
 
 // Display ratings 1-5 for the garage, derived from the numbers above.
@@ -201,11 +210,13 @@ export function statBars(id) {
 // Each leader's signature move. Charged by clean driving, fired with E / the portrait button.
 export const ABILITIES = [
   { id: 'immunity', name: 'חסינות־על', hint: 'בלתי פגיע · מעיף כל מי שבדרך' },
-  { id: 'breaking', name: 'מהדורה מיוחדת', hint: 'כל מי שלפניך מסתנוור' },
+  { id: 'breaking', name: 'מתקפת סייבר', hint: 'המסכים של כל מי שלפניך מחשיכים' },
   { id: 'protest', name: 'הפגנה', hint: 'שני מחסומי מחאה מאחוריך' },
   { id: 'resign', name: 'התפטרות', hint: 'יוצאים מהקואליציה… וחוזרים קדימה' },
   { id: 'funds', name: 'כספים קואליציוניים', hint: 'עשרה פתקים, מגנט וטורבו' },
-  { id: 'siren', name: 'סירנה', hint: 'מפנה את הכביש לפניך' }
+  { id: 'siren', name: 'סירנה', hint: 'מפנה את הכביש לפניך' },
+  { id: 'straight', name: 'קו ישר', hint: 'טורבו ומגן · בלי לסטות ימינה או שמאלה' },
+  { id: 'treasury', name: 'הקפאת תקציבים', hint: 'כל מי שסביבך מאבד פתקים, והם עוברים אליך' }
 ];
 
 // Charge earned per event; a full meter is 1.
@@ -267,6 +278,26 @@ export function useAbility(race, racer) {
       r.speed *= 0.82;
       emitRace(race, 'cleared', r, { from: racer.id });
     }
+  }
+  if (ability.id === 'straight') {
+    racer.boost = Math.max(racer.boost, 1.5);
+    racer.shield = Math.max(racer.shield, 3);
+    racer.blind = 0;
+    racer.confused = 0;
+    racer.abilityActive = 1.5;
+  }
+  if (ability.id === 'treasury') {
+    let taken = 0;
+    for (const r of race.racers) {
+      if (r === racer || r.finish !== null || r.star > 0 || Math.abs(r.s - racer.s) > 70) continue;
+      if (!racer.player && allied(race, racer, r)) continue;
+      const lost = loseBallots(race, r, 3);
+      if (!lost) continue;
+      taken += lost;
+      emitRace(race, 'frozen', r, { from: racer.id, count: lost });
+    }
+    racer.coins = Math.min(10, racer.coins + taken);
+    racer.boost = Math.max(racer.boost, 0.6);
   }
   return ability.id;
 }

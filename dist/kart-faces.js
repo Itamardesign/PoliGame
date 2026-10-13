@@ -12,16 +12,16 @@ export const FACES = {
     nose: [465, 440],
     mouth: [468, 488]
   },
-  lapid: {
-    hair: '#d2d2d0',
-    skin: '#c9987f',
-    box: [305, 115, 350, 446],
+  bennett: {
+    hair: '#6e5945',
+    skin: '#e4b58e',
+    box: [200, 58, 565, 720],
     eyes: [
-      [432, 360],
-      [558, 360]
+      [378, 408],
+      [580, 413]
     ],
-    nose: [490, 450],
-    mouth: [490, 500]
+    nose: [478, 535],
+    mouth: [476, 630]
   },
   golan: {
     hair: '#9d9990',
@@ -66,5 +66,27 @@ export const FACES = {
     ],
     nose: [310, 470],
     mouth: [312, 510]
+  },
+  eisenkot: {
+    hair: '#b8b6b2',
+    skin: '#d9a08a',
+    box: [140, 92, 715, 893],
+    eyes: [
+      [348, 528],
+      [595, 522]
+    ],
+    nose: [480, 700],
+    mouth: [480, 822]
+  },
+  smotrich: {
+    hair: '#4a3a2c',
+    skin: '#d39a7e',
+    box: [205, 85, 565, 775],
+    eyes: [
+      [365, 500],
+      [578, 488]
+    ],
+    nose: [485, 625],
+    mouth: [480, 712]
   }
 };

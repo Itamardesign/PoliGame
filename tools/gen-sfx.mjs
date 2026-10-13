@@ -6,7 +6,7 @@
 //   npm run sfx -- --only hit,land   (re)generate just these (sfx names or announcer text)
 //   npm run sfx -- --no-voice        skip the announcer
 //   npm run sfx -- --list            show what would be generated
-import { mkdir, writeFile, access } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { SFX, VOICE } from './sfx-catalog.mjs';
@@ -29,6 +29,13 @@ const ttsModel = process.env.ELEVENLABS_TTS_MODEL?.trim() || 'eleven_v3';
 
 const exists = f => access(f).then(() => true, () => false);
 const voiceFile = text => 'voice-' + Object.keys(VOICE).indexOf(text) + '.mp3';
+// Voice files are numbered by position, so a rewritten line lands on a file holding the old
+// recording. The last manifest says which text each file speaks; a mismatch means re-record.
+const previous = await readFile(path.join(outDir, 'manifest.json'), 'utf8').then(JSON.parse, () => ({}));
+const spoken = Object.fromEntries(Object.entries(previous.voice ?? {}).map(([text, file]) => [file, text]));
+const outdated = new Set(
+  Object.keys(VOICE).filter(text => spoken[voiceFile(text)] !== undefined && spoken[voiceFile(text)] !== text).map(voiceFile)
+);
 
 async function call(url, body) {
   for (let attempt = 1; ; attempt++) {
@@ -89,10 +96,11 @@ let made = 0,
   failed = 0;
 for (const j of jobs) {
   const target = path.join(outDir, j.file);
-  if (!j.wanted || (!force && (await exists(target)))) continue;
+  if (!j.wanted || (!force && !outdated.has(j.file) && (await exists(target)))) continue;
   process.stdout.write(`… ${j.label} → ${j.file}`);
   try {
     await writeFile(target, await j.run());
+    outdated.delete(j.file);
     made++;
     console.log('  ✓');
   } catch (err) {
@@ -113,7 +121,8 @@ for (const [name, s] of Object.entries(SFX)) {
   if (files.length) manifest.sfx[name] = { files, volume: s.volume ?? 0.6, ...(s.loop && { loop: true }) };
 }
 for (const text of Object.keys(VOICE))
-  if (await exists(path.join(outDir, voiceFile(text)))) manifest.voice[text] = voiceFile(text);
+  if (!outdated.has(voiceFile(text)) && (await exists(path.join(outDir, voiceFile(text)))))
+    manifest.voice[text] = voiceFile(text);
 await writeFile(path.join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 
 console.log(

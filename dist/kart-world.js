@@ -217,7 +217,7 @@ const STYLE = {
       wheel: { rim: '#dfe5ec', spokes: 8, hub: '#2875df' }
     };
   },
-  // Yesh Atid — "Atid GT": low wedge supercar with side pods, rear wing and an "ON AIR" studio light.
+  // Together — "Exit GT": low wedge supercar with side pods, rear wing and a blinking "EXIT" sign.
   sport(g, p) {
     const dark = '#141d24',
       white = '#f4f8fa';
@@ -244,15 +244,16 @@ const STYLE = {
     const wing = box(g, 2.3, 0.07, 0.58, p.color, 0, 1.72, -1.82);
     wing.rotation.x = 0.12;
     as(box(g, 1.9, 0.07, 0.04, '#ff4b5c', 0, 1.02, -1.96), 'glow', '#ff4b5c');
-    const onAir = label('ON AIR', 0.95, 0.26, '#e0303a', '#ffffff', 110);
+    const onAir = label('EXIT', 0.95, 0.26, '#0f2362', '#44c5bf', 120);
     onAir.position.set(0, 1.4, -1.9);
     onAir.rotation.y = Math.PI;
     g.add(onAir);
     g.userData.fx.push({ mesh: onAir, kind: 'blink', rate: 1.6 });
-    // A news-anchor's desk microphone on the dash.
+    // A start-up founder's phone on a dash mount.
     rod(g, [-0.62, 1.12, 0.95], [-0.62, 1.62, 0.8], 0.03, dark);
-    ball(g, 0.1, '#3a4046', -0.62, 1.7, 0.78, 1, 1.3, 1);
-    box(g, 0.14, 0.1, 0.03, '#22bddd', -0.62, 1.54, 0.86);
+    const phone = box(g, 0.2, 0.36, 0.03, '#15191c', -0.62, 1.74, 0.8);
+    phone.rotation.x = -0.25;
+    as(box(g, 0.17, 0.31, 0.01, '#7fe9ff', -0.62, 1.74, 0.82), 'glow', '#7fe9ff').rotation.x = -0.25;
     return {
       front: 2.1,
       rear: -1.98,
@@ -454,6 +455,102 @@ const STYLE = {
       ],
       flag: [0.8, 1.5, -1.6],
       wheel: { r: 0.6, w: 0.55, rim: '#566b4c', hub: '#d4eca8', spokes: 6, knobs: 16, rimKind: 'matte' }
+    };
+  },
+  // Yashar — "Chief of Staff Jeep": open command car with a sloped hood, folding windshield,
+  // whip antennas, a field radio and an operations map behind the seat.
+  command(g, p) {
+    const olive = '#2b3742',
+      black = '#1b1f22',
+      steel = '#b4bcc2';
+    box(g, 2.2, 0.22, 3.8, black, 0, 0.72, 0);
+    box(g, 2.15, 0.5, 3.5, p.color, 0, 1.06, -0.05);
+    const hood = box(g, 2.0, 0.28, 1.05, p.color, 0, 1.4, 1.35);
+    hood.rotation.x = 0.14;
+    box(g, 0.08, 0.02, 1.0, '#ffffff', 0, 1.56, 1.35).rotation.x = 0.14;
+    for (const s of [-1, 1]) {
+      as(box(g, 0.3, 0.18, 0.05, '#fff6cf', s * 0.78, 1.3, 1.84), 'glow', '#fff6cf');
+      as(box(g, 0.28, 0.12, 0.05, '#ff3030', s * 0.78, 1.12, -1.81), 'glow', '#ff3030');
+      box(g, 0.42, 0.1, 1.1, olive, s * 1.12, 1.42, 1.12);
+      box(g, 0.42, 0.1, 1.0, olive, s * 1.12, 1.42, -1.1);
+      // Whip antennas with red tips, bending back off the rear corners.
+      rod(g, [s * 0.85, 1.3, -1.6], [s * 0.98, 4.2, -1.8], 0.022, steel, 'chrome');
+      as(ball(g, 0.06, '#ff5a5a', s * 0.98, 4.22, -1.8), 'glow', '#ff5a5a');
+      rod(g, [s * 0.95, 1.32, 0.66], [s * 0.95, 2.02, 0.46], 0.05, black);
+    }
+    rod(g, [-0.95, 2.02, 0.46], [0.95, 2.02, 0.46], 0.05, black);
+    as(box(g, 1.8, 0.55, 0.04, '#cfe3f0', 0, 1.72, 0.56), 'glass', '#cfe3f0').rotation.x = -0.3;
+    // Field radio with blinking channel lights and a handset.
+    box(g, 0.62, 0.55, 0.42, olive, -0.55, 1.58, -1.38);
+    for (let i = 0; i < 3; i++) {
+      const led = as(box(g, 0.09, 0.06, 0.03, '#9fe8a0', -0.7 + i * 0.15, 1.7, -1.16), 'glow', '#9fe8a0');
+      g.userData.fx.push({ mesh: led, kind: 'blink', rate: 1.2 + i * 0.7, phase: i });
+    }
+    ball(g, 0.08, black, -0.3, 1.9, -1.2, 1, 0.6, 1.6);
+    // Operations map on a tilted board: blue and red arrows.
+    const board = box(g, 0.9, 0.04, 0.62, '#ece5c8', 0.45, 1.48, -1.32);
+    board.rotation.x = -0.25;
+    box(g, 0.5, 0.02, 0.06, '#2f6bff', 0.4, 1.53, -1.3).rotation.set(-0.25, 0.5, 0);
+    box(g, 0.32, 0.02, 0.06, '#e0303a', 0.55, 1.53, -1.45).rotation.set(-0.25, -0.6, 0);
+    for (const s of [-1, 1]) box(g, 0.28, 0.42, 0.16, olive, s * 0.6, 1.1, -1.92);
+    return {
+      front: 1.9,
+      rear: -1.9,
+      plateY: 1.05,
+      flames: [
+        [-0.6, 0.8, -2.0],
+        [0.6, 0.8, -2.0]
+      ],
+      flag: [0.88, 1.4, -0.6],
+      wheel: { r: 0.55, w: 0.5, rim: '#3a4650', hub: p.accent, spokes: 6, knobs: 14, rimKind: 'matte' }
+    };
+  },
+  // Religious Zionism — "Treasury Tractor": farm tractor with a short hood, exhaust stack, big rear
+  // wheels, a roll frame with a beacon and the Treasury's strongbox riding on the hitch.
+  tractor(g, p) {
+    const black = '#1d2022',
+      steel = '#c4ccd2',
+      green = '#3f6b35';
+    box(g, 1.0, 0.3, 3.5, black, 0, 0.8, 0.15);
+    box(g, 1.15, 0.72, 1.2, p.color, 0, 1.25, 1.35);
+    box(g, 1.17, 0.08, 1.22, green, 0, 1.63, 1.35);
+    for (let i = 0; i < 5; i++) as(box(g, 0.85, 0.05, 0.05, steel, 0, 1.06 + i * 0.1, 1.97), 'chrome', steel);
+    for (const s of [-1, 1]) {
+      as(ball(g, 0.12, '#fff6cf', s * 0.42, 1.5, 1.96, 1, 1, 0.5), 'glow', '#fff6cf');
+      // Rear mudguards over the big wheels.
+      box(g, 0.72, 0.1, 1.5, p.color, s * 1.13, 1.7, -1.0);
+      box(g, 0.1, 0.5, 1.5, p.color, s * 0.79, 1.45, -1.0);
+      // Roll frame.
+      rod(g, [s * 0.72, 1.0, -0.9], [s * 0.72, 3.45, -0.9], 0.06, black);
+      as(box(g, 0.24, 0.12, 0.05, '#ff3030', s * 0.32, 1.25, -1.75), 'glow', '#ff3030');
+    }
+    rod(g, [-0.72, 3.45, -0.9], [0.72, 3.45, -0.9], 0.06, black);
+    box(g, 1.7, 0.08, 1.3, p.color, 0, 3.52, -0.55);
+    const beacon = as(cyl(g, 0.13, 0.13, 0.2, '#ffa31a', 0.55, 3.66, -0.55), 'glow', '#ffa31a');
+    g.userData.fx.push({ mesh: beacon, kind: 'blink', rate: 2.2 });
+    // Short exhaust stack with a cap, kept below the driver's eye line.
+    cyl(g, 0.08, 0.08, 0.7, black, 0.4, 1.95, 1.7);
+    as(cyl(g, 0.12, 0.1, 0.12, steel, 0.4, 2.33, 1.7), 'chrome', steel);
+    // The strongbox: grey steel, a gold shekel, a dial.
+    as(box(g, 1.0, 0.62, 0.62, '#5d646b', 0, 1.3, -1.78), 'chrome', '#5d646b');
+    const shekel = label('₪', 0.42, 0.34, '#5d646b', '#f2d34f', 150);
+    shekel.position.set(-0.2, 1.3, -2.1);
+    shekel.rotation.y = Math.PI;
+    g.add(shekel);
+    const dial = as(cyl(g, 0.11, 0.11, 0.05, steel, 0.27, 1.3, -2.1), 'chrome', steel);
+    dial.rotation.x = Math.PI / 2;
+    return {
+      front: 2.0,
+      rear: -2.15,
+      plateY: 0.62,
+      flames: [
+        [-0.3, 0.8, -2.15],
+        [0.3, 0.8, -2.15]
+      ],
+      flag: [-0.9, 1.75, -1.4],
+      wheel: { r: 0.42, w: 0.36, rim: p.color, hub: steel, spokes: 5, rimKind: 'matte' },
+      rearWheel: { r: 0.78, w: 0.6, rim: p.color, hub: steel, spokes: 6, knobs: 18, rimKind: 'matte' },
+      wheelZ: [1.35, -1.0]
     };
   }
 };
@@ -761,16 +858,20 @@ function makeReactions(head, spec) {
   return { stars, swirl, paper };
 }
 
-// A small broadcast-style name tag: dark pill, party-colour stripe, white name.
-function nameTag(p) {
-  const c = document.createElement('canvas');
-  c.width = 384;
-  c.height = 96;
+// A small broadcast-style name tag: dark pill, party-colour stripe, white name. Coalition partners
+// get a green outline and a "partner" label (see setAllyTag).
+function drawNameTag(c, p, ally) {
   const x = c.getContext('2d');
+  x.clearRect(0, 0, c.width, c.height);
   x.fillStyle = 'rgba(11,20,34,0.86)';
   x.beginPath();
   x.roundRect(4, 8, 376, 80, 18);
   x.fill();
+  if (ally) {
+    x.strokeStyle = '#4cc38a';
+    x.lineWidth = 6;
+    x.stroke();
+  }
   x.fillStyle = p.color;
   x.beginPath();
   x.roundRect(332, 20, 14, 56, 4);
@@ -779,11 +880,31 @@ function nameTag(p) {
   x.font = '800 50px Heebo, Arial';
   x.textAlign = 'center';
   x.textBaseline = 'middle';
-  x.fillText(p.short, 170, 52, 290);
+  if (ally) {
+    x.fillText(p.short, 200, 52, 230);
+    x.fillStyle = '#4cc38a';
+    x.font = '800 30px Heebo, Arial';
+    x.fillText('שותפה', 50, 54, 80);
+  } else x.fillText(p.short, 170, 52, 290);
+}
+export function setAllyTag(g, ally) {
+  const tag = g.userData.name;
+  if (!tag || tag.userData.ally === ally) return;
+  tag.userData.ally = ally;
+  drawNameTag(tag.material.map.image, tag.userData.party, ally);
+  tag.material.map.needsUpdate = true;
+}
+function nameTag(p) {
+  const c = document.createElement('canvas');
+  c.width = 384;
+  c.height = 96;
+  drawNameTag(c, p, false);
   const t = new T.CanvasTexture(c);
   t.colorSpace = T.SRGBColorSpace;
-  return new T.Mesh(
+  const mesh = new T.Mesh(
     new T.PlaneGeometry(1.5, 0.375),
     new T.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, side: T.DoubleSide })
   );
+  mesh.userData = { party: p, ally: false };
+  return mesh;
 }

@@ -74,19 +74,19 @@ const check = async (name, fn) => {
 };
 
 try {
-  await check('title screen offers two race buttons and six drivers', async () => {
+  await check('title screen offers two race buttons and eight drivers', async () => {
     const page = await open({ width: 1440, height: 900 });
     await page.goto(BASE + '/?qa=1');
     await ready(page);
     assert.equal(await page.locator('.cta-buttons .cta').count(), 2);
-    assert.equal(await page.locator('#drivers .driver').count(), 6);
+    assert.equal(await page.locator('#drivers .driver').count(), 8);
     await page.locator('#drivers .driver').nth(2).click();
     assert.equal(await page.locator('#garageLeader').textContent(), 'יאיר גולן');
     await page.screenshot({ path: `${out}/title.png` });
     await page.close();
   });
 
-  await check('a single race runs to results with all six drivers timed', async () => {
+  await check('a single race runs to results with all eight drivers timed', async () => {
     const page = await open({ width: 1280, height: 800 });
     await page.addInitScript(() => localStorage.setItem('ck-mode', 'single'));
     await page.goto(BASE + '/?level=jerusalem');
@@ -96,7 +96,7 @@ try {
     await race(page);
     await page.screenshot({ path: `${out}/single-results.png` });
     const rows = await page.locator('#resultsBoard li').allTextContents();
-    assert.equal(rows.length, 6);
+    assert.equal(rows.length, 8);
     for (const row of rows) assert.match(row, /\d:\d\d\.\d\d|\+\d+\.\d\d/);
     await page.close();
   });
@@ -107,10 +107,10 @@ try {
     await ready(page);
     await page.evaluate(() => {
       __ck.setGp({
-        version: 2,
+        version: 3,
         player: 0,
         round: 1,
-        seats: [7, 12, 9, 5, 4, 3],
+        seats: [7, 12, 9, 5, 4, 3, 6, 2],
         history: [],
         coalition: [],
         loyalty: {},
@@ -120,9 +120,14 @@ try {
       });
       __ck.showTalks();
     });
-    assert.equal(await page.locator('#offers li').count(), 5);
+    assert.equal(await page.locator('#offers li').count(), 7);
     assert.equal(await page.locator('[data-invite="1"]').count(), 0, 'a bigger party must refuse');
-    await page.locator('[data-invite="2"]').click();
+    assert.equal(await page.locator('[data-invite="2"]').count(), 0, 'a vetoed party must refuse');
+    assert.match(await page.locator('[data-preview="2"]').textContent(), /לא יושבים איתכם/);
+    // Hovering an offer previews the coalition it would make.
+    await page.locator('[data-preview="4"]').hover();
+    assert.match(await page.locator('#talksSum').textContent(), /11/);
+    await page.locator('[data-invite="4"]').click();
     // Continue to the next race: the page moves to the second course with the coalition in place.
     await page.locator('#nextRace').click();
     await page.waitForURL(/level=market/);
@@ -135,41 +140,44 @@ try {
     );
     const gpState = await page.evaluate(() => readKartState());
     assert.equal(gpState.level, 'market');
-    assert.deepEqual(gpState.gp.coalition, [2]);
-    assert.ok(gpState.race.racers.length === 6);
+    assert.deepEqual(gpState.gp.coalition, [4]);
+    assert.ok(gpState.race.racers.length === 8);
     await page.goto(BASE + '/?qa=1');
     await ready(page);
     await page.evaluate(() => {
       __ck.setGp({
-        version: 2,
+        version: 3,
         player: 0,
         round: 1,
-        seats: [7, 12, 9, 5, 4, 3],
+        seats: [7, 12, 9, 5, 4, 3, 6, 2],
         history: [],
-        coalition: [2],
-        loyalty: { 2: 0.65 },
+        coalition: [4],
+        loyalty: { 4: 0.65 },
         left: [],
         done: false,
         talksPending: true
       });
       __ck.showTalks();
     });
-    assert.match(await page.locator('#talksSum').textContent(), /16/);
+    assert.match(await page.locator('#talksSum').textContent(), /11/);
+    await page.screenshot({ path: `${out}/gp-talks.png` });
     await page.evaluate(() => {
       __ck.setGp({
-        version: 2,
+        version: 3,
         player: 0,
         round: 3,
-        seats: [27, 22, 19, 21, 16, 15],
+        seats: [27, 22, 19, 21, 12, 9, 6, 4],
         history: [],
-        coalition: [2, 4],
+        coalition: [1, 3],
         loyalty: {},
         left: [],
         done: true
       });
       __ck.showFinal();
     });
-    assert.match(await page.locator('#finalTitle').textContent(), /מקים ממשלה/);
+    assert.match(await page.locator('#finalTitle').textContent(), /ראש הממשלה/);
+    assert.equal(await page.locator('#finalCabinet li').count(), 3);
+    assert.match(await page.locator('#finalLadder li.here').textContent(), /ראש הממשלה/);
     await page.screenshot({ path: `${out}/gp-final.png` });
     await page.close();
   });

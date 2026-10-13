@@ -21,7 +21,7 @@ const layout = (() => {
   return seats.sort((p, q) => p.a - q.a || q.row - p.row);
 })();
 
-// blocs: [{ color, seats, faded }] in seating order. Returns SVG markup.
+// blocs: [{ color, seats, faded, ghost }] in seating order. Returns SVG markup.
 export function chamberSVG(blocs, { label = '' } = {}) {
   const W = 200,
     H = 108,
@@ -36,7 +36,8 @@ export function chamberSVG(blocs, { label = '' } = {}) {
       const b = colors[i];
       const fill = b ? b.color : 'rgba(255,255,255,0.12)';
       const opacity = b?.faded ? 0.35 : 1;
-      return `<circle cx="${(cx + p.x * R).toFixed(2)}" cy="${(cy - p.y * R).toFixed(2)}" r="${dot}" fill="${fill}" opacity="${opacity}"/>`;
+      // A party being considered is drawn pulsing, so the arc it would add is easy to read.
+      return `<circle${b?.ghost ? ' class="ghost"' : ''} cx="${(cx + p.x * R).toFixed(2)}" cy="${(cy - p.y * R).toFixed(2)}" r="${dot}" fill="${fill}" opacity="${opacity}"/>`;
     })
     .join('');
   // Majority marker after the 61st seat: a tick at the angle where seat 61 sits.

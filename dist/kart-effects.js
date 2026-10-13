@@ -177,7 +177,11 @@ export function makeEffects(scene, track, karts, reduced) {
     }
     if (e.type === 'leaked') {
       burst(p, '#f4f1e6', 26);
-      say(p, e.breaking ? 'מבזק!' : 'הדלפה!', '#f6f1df');
+      say(p, e.breaking ? 'נפרצת!' : 'הדלפה!', '#f6f1df');
+    }
+    if (e.type === 'frozen') {
+      burst(p.clone().add(new T.Vector3(0, 0.6, 0)), '#bfe8ff', 18);
+      say(p, 'הוקפא!', '#bfe8ff');
     }
     if (e.type === 'spun') {
       ring(p, '#c79bff');
@@ -203,7 +207,9 @@ export function makeEffects(scene, track, karts, reduced) {
         protest: '#ff8a5c',
         resign: '#ffe9a8',
         funds: '#f4d36b',
-        siren: '#5d8cff'
+        siren: '#5d8cff',
+        straight: '#7cc8ff',
+        treasury: '#f2d34f'
       }[e.ability];
       burst(p, color, 42);
       ring(p, color);
