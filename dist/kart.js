@@ -1242,8 +1242,18 @@ $('pause').onclick = pause;
 $('resume').onclick = resume;
 $('restart').onclick = startRace_;
 $('quit').onclick = goHome;
-$('item').onclick = activateItem;
-$('ability').onclick = activateAbility;
+// Item and ability fire on pointerdown: phones do not synthesise a click while another finger is
+// on the screen, so with click they could not be used while steering. Click stays for the keyboard.
+for (const [id, fire] of [
+  ['item', activateItem],
+  ['ability', activateAbility]
+]) {
+  $(id).onpointerdown = e => {
+    e.preventDefault();
+    fire();
+  };
+  $(id).onclick = e => e.detail === 0 && fire();
+}
 $('camera').onclick = toggleCamera;
 $('nextRace').onclick = nextRace;
 $('talksQuit').onclick = goHome;
@@ -1285,6 +1295,7 @@ const touchCtl = makeTouchControls({
   zone: $('steerZone'),
   stick: $('stick'),
   hint: $('steerHint'),
+  driftButton: document.querySelector('.touch-drift'),
   onTap: () => state === 'running' && activateItem(),
   onDown: () => {
     if (state === 'countdown') launchPressed = count;

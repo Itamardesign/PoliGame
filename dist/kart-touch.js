@@ -3,12 +3,13 @@
 // - steer hard and hold it to start a drift (auto-drift), straighten up to fire the boost;
 // - pull the stick down to brake; throttle is always on;
 // - a quick tap in the zone uses the item;
+// - the drift button fills with the drift charge and turns into a turbo badge while boosting;
 // - optional tilt steering and the old arrow buttons as alternatives.
 const RADIUS = 58,
   DEAD = 6;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 
-export function makeTouchControls({ zone, stick, hint, onTap, onDown, haptic }) {
+export function makeTouchControls({ zone, stick, hint, driftButton, onTap, onDown, haptic }) {
   let mode = 'drag',
     autoDrift = true,
     pointer = null,
@@ -22,7 +23,8 @@ export function makeTouchControls({ zone, stick, hint, onTap, onDown, haptic }) 
     tiltZero = null,
     hardFor = 0,
     autoDrifting = false,
-    lastTier = 0;
+    lastTier = 0,
+    boosting = false;
   const knob = stick.querySelector('.stick-knob');
 
   function place(x, y) {
@@ -81,6 +83,22 @@ export function makeTouchControls({ zone, stick, hint, onTap, onDown, haptic }) 
     stick.classList.add('hidden');
   };
   zone.addEventListener('pointerup', end);
+  // Restart the burst animation on every new boost, even one that follows straight on another.
+  driftButton?.addEventListener(
+    'animationend',
+    e => e.animationName === 'turbo-burst' && driftButton.classList.remove('burst')
+  );
+  function showBoost(on) {
+    if (!driftButton || on === boosting) return;
+    boosting = on;
+    driftButton.classList.toggle('boosting', on);
+    driftButton.setAttribute('aria-label', on ? 'טורבו' : 'דריפט');
+    if (on) {
+      driftButton.classList.remove('burst');
+      void driftButton.offsetWidth;
+      driftButton.classList.add('burst');
+    }
+  }
   zone.addEventListener('pointercancel', end);
   zone.addEventListener('lostpointercapture', end);
 
@@ -127,6 +145,9 @@ export function makeTouchControls({ zone, stick, hint, onTap, onDown, haptic }) 
       hardFor = 0;
       autoDrifting = false;
       lastTier = 0;
+      showBoost(false);
+      if (driftButton) driftButton.dataset.tier = 0;
+      driftButton?.style.setProperty('--charge', 0);
       stick.classList.add('hidden');
       hint.classList.remove('hidden');
     },
@@ -159,9 +180,12 @@ export function makeTouchControls({ zone, stick, hint, onTap, onDown, haptic }) 
         : 0;
       if (tier !== lastTier) {
         stick.dataset.tier = tier;
+        if (driftButton) driftButton.dataset.tier = tier;
         if (tier > lastTier) haptic?.(8 + tier * 6);
         lastTier = tier;
       }
+      driftButton?.style.setProperty('--charge', player?.drifting ? Math.min(1, player.charge / 2.4) : 0);
+      showBoost(!!player && player.boost > 0 && player.finish == null);
       return { steer, brake, drift: buttons.drift || autoDrifting, accelerate: true };
     }
   };

@@ -52,7 +52,7 @@ test('every driver has a finishing time and the field finishes close together', 
 test('rivals mostly steer around barriers they can see', () => {
   const { events } = race('insane', 5);
   const barrierHits = events.filter(e => !e.player && e.type === 'hit' && e.cause === 'barrier').length;
-  // Five rivals, three laps, about a dozen barriers per lap.
+  // Five rivals, three laps, about seven barriers per lap.
   assert.ok(barrierHits < 15, 'barrier hits ' + barrierHits);
 });
 

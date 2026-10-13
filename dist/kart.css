@@ -1995,8 +1995,137 @@ dialog#info kbd {
   border-radius: 50%;
   font-size: 16px;
   pointer-events: auto;
+  --charge: 0;
+  --tier-color: rgb(255 255 255 / 0.5);
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  transition:
+    background 0.25s,
+    box-shadow 0.25s,
+    transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+/* The rim fills with the drift charge in the tier colour (blue, orange, purple). */
+.touch-drift[data-tier='1'] {
+  --tier-color: #7fe9ff;
+}
+.touch-drift[data-tier='2'] {
+  --tier-color: #ffb14a;
+}
+.touch-drift[data-tier='3'] {
+  --tier-color: #ee8dff;
+}
+.drift-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  padding: 4px;
+  background: conic-gradient(var(--tier-color) calc(var(--charge) * 1turn), transparent 0);
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+.touch-drift[data-tier='3'] .drift-ring {
+  filter: drop-shadow(0 0 8px #ee8dff);
+}
+/* Both faces share one cell and swap with a flip-and-zoom. */
+.drift-face {
+  grid-area: 1 / 1;
+  transition:
+    opacity 0.22s,
+    transform 0.32s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.speed-face {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  opacity: 0;
+  transform: scale(0.4) rotate(-25deg);
+}
+.speed-face svg {
+  width: 34px;
+  height: 34px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.speed-face b {
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+.touch .touch-drift.boosting {
+  background: linear-gradient(160deg, #ffe08a, #ff8a3d 55%, #e5383b);
+  color: #2a0d00;
+  box-shadow:
+    0 0 0 3px rgb(255 214 120 / 0.55),
+    0 0 26px rgb(255 138 61 / 0.85);
+  transform: scale(1.08);
+}
+.touch-drift.boosting .drift-ring {
+  opacity: 0;
+}
+.touch-drift.boosting .drift-text {
+  opacity: 0;
+  transform: scale(1.6);
+}
+.touch-drift.boosting .speed-face {
+  opacity: 1;
+  transform: none;
+}
+.touch-drift.boosting .speed-face svg {
+  animation: turbo-chevrons 0.4s linear infinite;
+}
+@keyframes turbo-chevrons {
+  from {
+    transform: translateY(6px);
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-6px);
+    opacity: 0.55;
+  }
+}
+/* A shockwave ring bursts out as each boost starts. */
+.touch-drift::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid #ffd27a;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+.touch-drift.burst::after {
+  animation: turbo-burst 0.55s ease-out;
+}
+@keyframes turbo-burst {
+  from {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .touch-drift.boosting .speed-face svg,
+  .touch-drift.burst::after {
+    animation: none;
+  }
 }
 @media (pointer: coarse) {
+  .item-slot,
+  .ability {
+    touch-action: none;
+  }
   .hud-kit {
     left: auto;
     right: 14px;
