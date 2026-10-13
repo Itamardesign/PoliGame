@@ -195,19 +195,21 @@
       <div id="toast" class="toast" role="status"></div>
 
       <div id="touch" class="touch hidden" role="group" aria-label="פקדי נהיגה">
-        <div class="touch-steer">
-          <button data-key="left" aria-label="שמאלה">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-          </button>
-          <button data-key="right" aria-label="ימינה">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-          </button>
+        <div id="steerZone" class="steer-zone" aria-label="גררו כדי לנהוג">
+          <div id="stick" class="stick hidden" data-tier="0">
+            <span class="stick-base"></span><span class="stick-knob"></span>
+          </div>
+          <span id="steerHint" class="steer-hint">גררו כדי לנהוג · משיכה חזקה = דריפט</span>
+          <div class="touch-steer">
+            <button data-key="left" aria-label="שמאלה">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+            </button>
+            <button data-key="right" aria-label="ימינה">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
         </div>
-        <div class="touch-actions">
-          <button data-key="brake" class="touch-brake" aria-label="בלם">בלם</button>
-          <button data-key="drift" class="touch-drift" aria-label="דריפט">דריפט</button>
-          <button data-key="accelerate" class="touch-gas" aria-label="גז">גז</button>
-        </div>
+        <button data-key="drift" class="touch-drift" aria-label="דריפט">דריפט</button>
       </div>
 
       <!-- Pause -->
@@ -221,6 +223,17 @@
             </label>
             <input id="steeringSensitivity" type="range" min="0.65" max="1.35" step="0.05" value="1" />
             <label class="toggle"><span>מצלמה רחבה</span><input id="wideToggle" type="checkbox" /></label>
+            <div class="touch-only segmented" role="radiogroup" aria-label="היגוי במגע">
+              <span>היגוי במגע</span>
+              <div>
+                <button type="button" data-steer="drag" role="radio">גרירה</button>
+                <button type="button" data-steer="tilt" role="radio">הטיה</button>
+                <button type="button" data-steer="buttons" role="radio">כפתורים</button>
+              </div>
+            </div>
+            <label class="toggle touch-only"
+              ><span>דריפט אוטומטי בפנייה חזקה</span><input id="autoDriftToggle" type="checkbox"
+            /></label>
             <label class="toggle"><span>צליל</span><input id="soundToggle" type="checkbox" /></label>
             <label class="toggle"><span>מוזיקה</span><input id="musicToggle" type="checkbox" /></label>
             <label class="toggle"><span>קריין בעברית</span><input id="voiceToggle" type="checkbox" /></label>

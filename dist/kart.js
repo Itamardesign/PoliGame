@@ -34,6 +34,7 @@ import { LEVELS, levelById } from './kart-levels.js';
 import { makeRecorder, sampleGhost, loadGhost } from './ghost.js';
 import { makeHud, formatTime } from './kart-hud.js';
 import { makeAudio } from './kart-audio.js';
+import { makeTouchControls } from './kart-touch.js';
 import { MOODS } from './world-set.js';
 import * as GP from './gp.js';
 import {
@@ -506,6 +507,7 @@ function startRace_() {
   trails.reset();
   clearDrops();
   hud.reset();
+  touchCtl.reset();
   seenEvent = 0;
   launchPressed = 99;
   playerHits = {};
@@ -555,7 +557,7 @@ function startRace_() {
   arena.classList.add('racing');
   $('countdown').textContent = '3';
   $('raceHint').textContent = touchDevice()
-    ? 'הקישו גז בדיוק כשמופיע 1 — זינוק טורבו'
+    ? 'געו במסך בדיוק כשמופיע 1 — זינוק טורבו'
     : 'לחצו W בדיוק כשמופיע 1 — זינוק טורבו';
   hud.resetTicker(
     inGp
@@ -707,8 +709,14 @@ function consumeEvents() {
     if (e.type === 'hit') {
       callout(e.cause === 'barrier' ? 'מחסום' : e.cause === 'noconf' ? 'אי־אמון' : 'ספין', 'danger');
       tone(130, 0.24, 'sawtooth');
+      pulse([40, 30, 40]);
     }
-    if (e.type === 'drift-boost') tone(700 + e.tier * 160, 0.16);
+    if (e.type === 'drift-boost') {
+      tone(700 + e.tier * 160, 0.16);
+      pulse(18 + e.tier * 8);
+    }
+    if (e.type === 'wall') pulse(20);
+    if (e.type === 'land') pulse(e.trick ? [12, 20, 24] : 14);
     if (e.type === 'land' && e.trick) {
       callout('נחיתה מושלמת', 'gold');
       tone(1100, 0.22);
@@ -1090,14 +1098,18 @@ function frame(now) {
     const p = race.racers[0],
       before = p.s,
       wasRoute = !!p.routeId;
+    // Phones and tablets drive with the touch module (analog stick, auto-drift, full throttle);
+    // a keyboard plugged into a tablet still works alongside it.
+    const pad = touchDevice() ? touchCtl.read(dt, p, controls) : null;
+    const keySteer = Number(controls.right) - Number(controls.left);
     stepRace(
       race,
       dt,
       {
-        steer: Number(controls.right) - Number(controls.left),
-        drift: controls.drift,
-        brake: controls.brake,
-        accelerate: controls.accelerate,
+        steer: pad && !keySteer ? pad.steer : keySteer,
+        drift: controls.drift || !!pad?.drift,
+        brake: controls.brake || !!pad?.brake,
+        accelerate: controls.accelerate || !!pad,
         sensitivity
       },
       routeBend(track, p)
@@ -1235,10 +1247,45 @@ $('share').onclick = async () => {
   } catch {}
 };
 arena.addEventListener('pointerdown', () => state === 'intro' && beginCountdown());
-canvas.addEventListener('pointerup', e => {
-  if (e.pointerType !== 'mouse' && touchDevice() && state === 'running' && race?.racers[0].item)
-    activateItem();
+// Touch driving: a quick tap in the steering zone fires the item; touching at "1" is a launch.
+const touchCtl = makeTouchControls({
+  zone: $('steerZone'),
+  stick: $('stick'),
+  hint: $('steerHint'),
+  onTap: () => state === 'running' && activateItem(),
+  onDown: () => {
+    if (state === 'countdown') launchPressed = count;
+    if (state === 'intro') beginCountdown();
+  },
+  haptic: pattern => pulse(pattern)
 });
+let steerMode = stored('ck-steer-mode', 'drag'),
+  autoDriftOn = stored('ck-auto-drift', 'on') === 'on';
+async function setSteerMode(next) {
+  const ok = await touchCtl.setMode(next);
+  if (!ok) {
+    toast('אין גישה לחיישן ההטיה — נשארים עם גרירה');
+    next = 'drag';
+    await touchCtl.setMode(next);
+  }
+  steerMode = next;
+  save('ck-steer-mode', next);
+  for (const b of document.querySelectorAll('[data-steer]'))
+    b.setAttribute('aria-checked', String(b.dataset.steer === next));
+}
+for (const b of document.querySelectorAll('[data-steer]')) b.onclick = () => setSteerMode(b.dataset.steer);
+$('autoDriftToggle').checked = autoDriftOn;
+touchCtl.setAutoDrift(autoDriftOn);
+$('autoDriftToggle').onchange = e => {
+  autoDriftOn = e.target.checked;
+  save('ck-auto-drift', autoDriftOn ? 'on' : 'off');
+  touchCtl.setAutoDrift(autoDriftOn);
+};
+// Tilt needs a fresh permission tap on iOS, so a saved tilt choice starts as drag until re-picked.
+setSteerMode(steerMode === 'tilt' ? 'drag' : steerMode);
+// No long-press menus, text selection or pinch zoom while playing.
+arena.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('gesturestart', e => e.preventDefault());
 $('sound').onclick = () => setSound(!sound);
 $('soundToggle').onchange = e => setSound(e.target.checked);
 $('musicToggle').onchange = e => {
@@ -1300,7 +1347,7 @@ for (const button of document.querySelectorAll('[data-key]')) {
   button.onpointerdown = e => {
     e.preventDefault();
     if (!['running', 'countdown'].includes(state)) return;
-    if (state === 'countdown' && button.dataset.key === 'accelerate') launchPressed = count;
+    if (state === 'countdown') launchPressed = count;
     button.setPointerCapture(e.pointerId);
     touchKeys.add(button.dataset.key);
     syncControls();

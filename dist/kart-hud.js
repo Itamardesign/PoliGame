@@ -10,6 +10,7 @@ const $ = id => document.getElementById(id);
 export const formatTime = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
 const name = id => PARTIES[id].short;
 
+const compactBallots = () => innerWidth <= 760;
 export function makeHud({ arena, track, reduced, touch }) {
   // Ticker: one headline at a time, each held long enough to read.
   const queue = [];
@@ -228,7 +229,9 @@ export function makeHud({ arena, track, reduced, touch }) {
       ).join('');
     }
     const bonus = Math.round(((carried * (p.stats?.ballot ?? 0.2)) / 35) * 100);
-    $('coins').textContent = `${bonus ? '+' + bonus + '% מהירות · ' : ''}${p.votes} קולות`;
+    $('coins').textContent = compactBallots()
+      ? `${p.votes} קולות`
+      : `${bonus ? '+' + bonus + '% מהירות · ' : ''}${p.votes} קולות`;
     $('effectStatus').textContent =
       p.confused > 0
         ? 'ההגה הפוך'

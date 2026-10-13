@@ -1895,3 +1895,220 @@ dialog#info kbd {
 .ballot-slots i.off {
   background: repeating-linear-gradient(45deg, rgb(229 56 59 / 0.6) 0 2px, transparent 2px 4px);
 }
+
+/* ——— Touch driving ———
+   Left/lower area: drag anywhere to steer (a stick appears under the thumb).
+   Right thumb arc: ability, item and drift buttons, stacked within reach. */
+.touch {
+  inset: 0;
+  padding: 0;
+  display: block;
+  pointer-events: none;
+}
+.steer-zone {
+  position: absolute;
+  left: 0;
+  top: 24%;
+  bottom: calc(38px + var(--safe-b));
+  width: 60%;
+  pointer-events: auto;
+  touch-action: none;
+}
+.stick {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.stick-base,
+.stick-knob {
+  position: absolute;
+  border-radius: 50%;
+  translate: -50% -50%;
+}
+.stick-base {
+  width: 120px;
+  height: 120px;
+  background: rgb(11 20 34 / 0.28);
+  box-shadow:
+    inset 0 0 0 2px rgb(255 255 255 / 0.35),
+    0 0 0 1px rgb(11 20 34 / 0.3);
+}
+.stick-knob {
+  width: 56px;
+  height: 56px;
+  background: rgb(255 255 255 / 0.9);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.35);
+  transition:
+    background 0.15s,
+    box-shadow 0.15s;
+}
+.stick[data-tier='1'] .stick-knob {
+  background: #7fe9ff;
+  box-shadow: 0 0 22px #7fe9ff;
+}
+.stick[data-tier='2'] .stick-knob {
+  background: #ffb14a;
+  box-shadow: 0 0 24px #ffb14a;
+}
+.stick[data-tier='3'] .stick-knob {
+  background: #ee8dff;
+  box-shadow: 0 0 28px #ee8dff;
+}
+.steer-hint {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  translate: -50% -50%;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--panel);
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  animation: hint-breathe 1.6s ease-in-out infinite;
+}
+@keyframes hint-breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+.steer-zone .touch-steer {
+  display: none;
+}
+.steer-zone.buttons-mode .touch-steer {
+  display: flex;
+  position: absolute;
+  left: 14px;
+  bottom: 8px;
+  gap: 10px;
+}
+.steer-zone.buttons-mode .steer-hint {
+  display: none;
+}
+.touch .touch-drift {
+  position: absolute;
+  right: 14px;
+  bottom: calc(44px + var(--safe-b));
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  font-size: 16px;
+  pointer-events: auto;
+}
+@media (pointer: coarse) {
+  .hud-kit {
+    left: auto;
+    right: 14px;
+    bottom: calc(148px + var(--safe-b));
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .item-slot,
+  .ability {
+    padding: 6px;
+    border-radius: 50%;
+  }
+  .hud-kit .kit-copy {
+    display: none;
+  }
+  .item-icon,
+  .ability img {
+    width: 66px;
+    height: 66px;
+    border-radius: 50%;
+  }
+  .race-hint {
+    top: 30%;
+    bottom: auto;
+  }
+}
+/* Portrait phones: steer with the thumb over the lower screen, buttons in the right column. */
+@media (pointer: coarse) and (orientation: portrait) {
+  .steer-zone {
+    top: 42%;
+    width: auto;
+    right: 112px;
+  }
+}
+.touch-only {
+  display: none !important;
+}
+@media (pointer: coarse) {
+  .touch-only {
+    display: flex !important;
+  }
+}
+.segmented {
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+}
+.segmented > div {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.06);
+}
+.segmented button {
+  border: 0;
+  border-radius: 8px;
+  min-height: 40px;
+  background: none;
+  font-weight: 700;
+}
+.segmented button[aria-checked='true'] {
+  background: var(--gold);
+  color: #201703;
+}
+
+/* Compact ballot meter on phones: slots and the vote count only, on one line. */
+@media (max-width: 760px) {
+  .hud-drive {
+    top: calc(var(--gutter) + 46px);
+    left: 50%;
+  }
+  .ballots {
+    white-space: nowrap;
+    padding: 3px 8px;
+  }
+  .ballot-slots i {
+    width: 7px;
+    height: 11px;
+  }
+  .ballots .hud-coins {
+    font-size: 12px;
+  }
+}
+/* Short landscape screens: a tighter thumb column so it clears the position block. */
+@media (pointer: coarse) and (max-height: 520px) {
+  .touch .touch-drift {
+    width: 76px;
+    height: 76px;
+    bottom: calc(40px + var(--safe-b));
+  }
+  .hud-kit {
+    bottom: calc(124px + var(--safe-b));
+    gap: 6px;
+  }
+  .item-icon,
+  .ability img {
+    width: 54px;
+    height: 54px;
+  }
+  .hud-kit {
+    flex-direction: row-reverse;
+    align-items: flex-end;
+  }
+  .hud-drive {
+    bottom: calc(40px + var(--safe-b));
+  }
+}
+@media (max-width: 760px) and (orientation: portrait) {
+  .hud-drive {
+    top: calc(var(--gutter) + 150px);
+  }
+}

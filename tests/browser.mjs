@@ -65,7 +65,9 @@ async function race(page) {
   await page.keyboard.up('KeyW');
   await page.waitForFunction(() => readKartState().state === 'results', null, { timeout: 20000 });
 }
+const only = process.argv[2];
 const check = async (name, fn) => {
+  if (only && !name.includes(only)) return;
   const started = Date.now();
   await fn();
   console.log(`✔ ${name} (${((Date.now() - started) / 1000).toFixed(1)}s)`);
@@ -198,10 +200,11 @@ try {
     assert.ok(box && box.y + box.height <= 844, 'start button visible');
     await page.locator('#play').tap();
     await page.waitForFunction(() => ['intro', 'countdown', 'running'].includes(readKartState().state));
-    await page.locator('#game').tap();
+    await page.locator('#steerZone').tap();
     await page.waitForFunction(() => readKartState().state === 'running', null, { timeout: 20000 });
-    for (const key of ['left', 'right', 'accelerate', 'drift'])
-      assert.ok(await page.locator(`[data-key="${key}"]`).isVisible());
+    // Drag-to-steer zone, drift button and the item and ability thumbs are all on screen.
+    for (const sel of ['#steerZone', '[data-key="drift"]', '#item', '#ability'])
+      assert.ok(await page.locator(sel).isVisible(), sel);
     await page.screenshot({ path: `${out}/phone-race.png` });
     await page.close();
   });
