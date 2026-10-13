@@ -2,7 +2,6 @@
 
 // Moving spin balls ("ball") and bonus gates ("gate"), placed by lap fraction u.
 export const ENCOUNTERS = [
-  { id: 'ballot', kind: 'ball', u: 0.075 },
   { id: 'gate', kind: 'gate', u: 0.3 },
   { id: 'market', kind: 'ball', u: 0.6 },
   { id: 'prize', kind: 'gate', u: 0.7 },
@@ -11,17 +10,12 @@ export const ENCOUNTERS = [
 
 export function encountersFor(levelId = 'jerusalem') {
   if (levelId === 'market')
-    return [
-      ...ENCOUNTERS,
-      { id: 'market-entry', kind: 'ball', u: 0.43 },
-      { id: 'market-exit', kind: 'ball', u: 0.78 }
-    ].sort((a, b) => a.u - b.u);
+    return [...ENCOUNTERS, { id: 'market-entry', kind: 'ball', u: 0.43 }].sort((a, b) => a.u - b.u);
   if (levelId === 'midnight')
     return [
       ...ENCOUNTERS,
       { id: 'night-1', kind: 'ball', u: 0.18 },
-      { id: 'night-2', kind: 'ball', u: 0.42 },
-      { id: 'night-3', kind: 'ball', u: 0.78 }
+      { id: 'night-2', kind: 'ball', u: 0.42 }
     ].sort((a, b) => a.u - b.u);
   return ENCOUNTERS;
 }
@@ -45,7 +39,7 @@ export function layoutPickups(length, bend = () => 0, height = null) {
   for (let s = 19; s < length; s += 28)
     for (let j = 0; j < 3; j++) add('coin', s + j * 3.5, Math.sin(s * 0.06) * 6.2);
   // Roadworks barriers, spaced wide enough that the road stays a race rather than a slalom.
-  for (let s = 68; s < length; s += 140) add('barrier', s, Math.sin(s * 0.2) * 6.2);
+  for (let s = 68; s < length; s += 210) add('barrier', s, Math.sin(s * 0.2) * 6.2);
   for (let s = 95; s < length; s += 150) add('boost', s, Math.sign(bend(s) || 1) * -7.3);
   for (const u of [0.33, 0.73]) add('ramp', length * u, 0);
   // The temptation in the committee's lane: a boost strip right under the gantry.

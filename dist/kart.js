@@ -23,7 +23,7 @@ import {
   box,
   label
 } from './kart-world.js';
-import { makeShortcuts, racerFrame, routeBend, buildShortcuts } from './kart-routes.js';
+import { racerFrame, routeBend } from './kart-routes.js';
 import { stepEncounters, bumpRivals } from './kart-encounters.js';
 import { makeEncounterWorld } from './kart-encounter-world.js';
 import { makeEffects } from './kart-effects.js';
@@ -132,12 +132,12 @@ sun.shadow.normalBias = 0.06;
 scene.add(sun, sun.target);
 const camera = new T.PerspectiveCamera(46, 1, 0.1, 800),
   track = makeTrack(level.id);
-track.shortcuts = level.id === 'jerusalem' ? makeShortcuts(track) : [];
+// No side roads: every course is the main road only.
+track.shortcuts = [];
 const logos = await loadLogos();
 const world = new T.Group();
 scene.add(world);
 const scenery = buildWorld(world, track, { mood: level.mood ?? 'day', logos, level });
-buildShortcuts(world, track, box, label, mat);
 
 let selected = clamp(Number(stored('ck-driver', '0')) || 0, 0, PARTIES.length - 1),
   state = 'home',
