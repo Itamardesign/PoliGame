@@ -14,6 +14,7 @@ const types = {
   '.ttf': 'font/ttf',
   '.jpg': 'image/jpeg',
   '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json',
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg'
 };
@@ -37,4 +38,6 @@ http
       res.end('Not found');
     }
   })
-  .listen(4173, '127.0.0.1', () => console.log('Local: http://127.0.0.1:4173'));
+  .listen(Number(process.env.PORT) || 4173, '127.0.0.1', function () {
+    console.log('Local: http://127.0.0.1:' + this.address().port);
+  });

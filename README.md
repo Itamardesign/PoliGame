@@ -2,7 +2,7 @@
 
 A Hebrew 3D kart racer about Israeli politics. Six leaders race through a Jerusalem built in code, and the main mode is a three-race season for the Knesset's 120 seats: nobody wins 61 alone, so between races you build a coalition.
 
-Single-player, in the browser, no backend. Everything except the party marks, the portraits and the font is generated in code: the city, the karts, the textures, the music and the sound.
+Single-player, in the browser, no backend. Everything except the party marks, the portraits, the font and the recorded sound is generated in code: the city, the karts, the textures and the music.
 
 ## Run
 
@@ -16,8 +16,6 @@ Import the repository with **Root Directory** `coalition-chaos` if you import th
 
 - **The Race to 61 (המרוץ ל־61).** Three races (Knesset Avenue at 150cc, the reversed city at dusk at 200cc, Jerusalem at night at 250cc) hand out the 120 seats: mostly by finishing place, partly by the ballot slips (votes) each party collects. Between races you may invite up to two partners, but a party will not join as a junior partner if it holds more than four seats more than you. Partners stop targeting you and cover your back on track, and each brings a demand that handicaps you while they stay: starting from the back of the grid, a ballot cap, shorter drift boosts, an empty ballot box every third time, no launch boost, or no no-confidence votes. Hit a partner, or let them outrun you, and their loyalty drops until they walk out. The season ends with the count: a government, an opposition government, or a 60–60 deadlock.
 - **Single race (מרוץ בודד).** Any course, three laps, six drivers.
-- **Time trial (נגד השעון).** Race alone against a translucent ghost of your best run on that course, with a live gap to the ghost and lap splits. Every ballot box is a turbo.
-- **Daily challenge (אתגר יומי).** The date picks the course, the driver and the seed of the starting field, the same for everyone that day. Results can be shared as a line of text.
 
 ## How it plays
 
@@ -44,20 +42,19 @@ Buildings are Jerusalem limestone with roller blinds, balconies and rooftop sola
 | `race-items.js` | Items, abilities, vehicle stats |
 | `race-course.js` | Pickup and hazard layout shared by simulation and renderer |
 | `gp.js` | The Race to 61 season: seats, talks, demands, loyalty, verdict |
-| `ghost.js` | Time-trial recording and playback |
 | `world-kit.js`, `world-set.js` | Procedural textures and props, and the dressed city |
 | `kart-world.js`, `kart-drivers.js` | Karts and drivers |
 | `kart-motion.js`, `kart-trails.js` | Kart animation, smoke, sparks and dust |
 | `kart-hud.js`, `kart-menus.js`, `ui-*.js` | HUD, ticker, menus, the Knesset chamber chart |
-| `kart-audio.js` | Synthesized engine, sound effects and music |
+| `kart-audio.js` | Recorded engine loops, effects and announcer (synthesized fallbacks), procedural music |
 | `kart.js` | Rendering, input and the game loop |
 
 ## Validation
 
-- `npm test` runs the simulation tests: physics, AI behaviour, items and abilities, the Grand Prix rules, ghosts.
+- `npm test` runs the simulation tests: physics, AI behaviour, items and abilities, the Grand Prix rules.
 - `npm run check` syntax-checks every module.
-- `npm run test:browser` plays a full race with real keyboard input in Chromium, checks the Grand Prix talks and final count, a time trial and the phone layout, and fails on any page error.
-- `npm run sim -- skilled 8` (or `casual`) runs headless races on every course and reports places, spread and hit causes. `tools/gp-sim.mjs` plays whole seasons. `tools/shoot.mjs`, `tools/flow.mjs`, `tools/modes.mjs` and `tools/perf.mjs` take screenshots and measure frame rate.
+- `npm run test:browser` plays a full race with real keyboard input in Chromium, checks the Grand Prix talks and final count and the phone layout, and fails on any page error.
+- `npm run sim -- skilled 8` (or `casual`) runs headless races on every course and reports places, spread and hit causes. `tools/gp-sim.mjs` plays whole seasons. `tools/shoot.mjs`, `tools/flow.mjs` and `tools/perf.mjs` take screenshots and measure frame rate.
 
 The simulation is deterministic per seed. On an Intel UHD 620 a race holds about 55–60 fps; render resolution adapts if frames run long.
 
@@ -85,4 +82,16 @@ Driver portraits (cropped from the originals, stylized, and mapped onto 3D heads
 - Aryeh Deri: `אריה_דרעי_2.jpg`, רווח הפקות, CC BY-SA 3.0
 - Itamar Ben-Gvir: `Itamar_Ben_Gvir_3_(cropped).jpg`, אלון נוריאל, CC BY-SA 3.0
 
-The portraits are repainted in code at load (smoothed, banded into painted tones and inked along strong edges) before being mapped onto the heads; the modified faces are shared under the same CC BY-SA terms. All other 3D geometry, textures, the city, vehicles, animation, music and sound are original procedural work generated in code.
+The portraits are repainted in code at load (smoothed, banded into painted tones and inked along strong edges) before being mapped onto the heads; the modified faces are shared under the same CC BY-SA terms. All other 3D geometry, textures, the city, vehicles, animation and music are original procedural work generated in code.
+
+## Sound
+
+Engine loops, tyres, crashes, items, abilities, crowd and the Hebrew announcer are generated with the ElevenLabs Sound Effects and Text to Speech APIs into `dist/assets/sfx/` (prompts in `tools/sfx-catalog.mjs`, files listed in `manifest.json`). The game loads them at start; any sound that is missing plays its synthesized stand-in.
+
+To regenerate, copy `.env.example` to `.env`, set `ELEVENLABS_API_KEY` (and optionally `ELEVENLABS_VOICE_ID`), then:
+
+- `npm run sfx` generates whatever is missing; `--force` regenerates everything.
+- `npm run sfx -- --only hit,land` redoes specific sounds or announcer lines.
+- `npm run sfx -- --list` shows the catalog.
+
+The key is used only on your machine; the deployed game ships plain mp3 files.

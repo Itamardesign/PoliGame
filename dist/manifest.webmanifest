@@ -1,0 +1,22 @@
+{
+  "id": "./",
+  "name": "קואליציה קארט",
+  "short_name": "קואליציה קארט",
+  "description": "מרוץ קארטינג סאטירי בתלת־ממד: שישה מנהיגים, שלושה מסלולים, 120 מנדטים — ומי שמרכיב 61 מקים ממשלה.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#0b1422",
+  "theme_color": "#0b1422",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

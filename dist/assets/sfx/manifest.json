@@ -1,0 +1,385 @@
+{
+  "sfx": {
+    "engine-low": {
+      "files": [
+        "engine-low.mp3"
+      ],
+      "volume": 0.55,
+      "loop": true
+    },
+    "engine-high": {
+      "files": [
+        "engine-high.mp3"
+      ],
+      "volume": 0.5,
+      "loop": true
+    },
+    "screech": {
+      "files": [
+        "screech.mp3"
+      ],
+      "volume": 0.45,
+      "loop": true
+    },
+    "boost-loop": {
+      "files": [
+        "boost-loop.mp3"
+      ],
+      "volume": 0.4,
+      "loop": true
+    },
+    "crowd": {
+      "files": [
+        "crowd.mp3"
+      ],
+      "volume": 0.18,
+      "loop": true
+    },
+    "countdown-beep": {
+      "files": [
+        "countdown-beep.mp3"
+      ],
+      "volume": 0.6
+    },
+    "countdown-go": {
+      "files": [
+        "countdown-go.mp3"
+      ],
+      "volume": 0.7
+    },
+    "grid-rev": {
+      "files": [
+        "grid-rev.mp3"
+      ],
+      "volume": 0.6
+    },
+    "launch-boost": {
+      "files": [
+        "launch-boost.mp3"
+      ],
+      "volume": 0.7
+    },
+    "drift-start": {
+      "files": [
+        "drift-start-1.mp3",
+        "drift-start-2.mp3"
+      ],
+      "volume": 0.5
+    },
+    "drift-boost-1": {
+      "files": [
+        "drift-boost-1.mp3"
+      ],
+      "volume": 0.6
+    },
+    "drift-boost-2": {
+      "files": [
+        "drift-boost-2.mp3"
+      ],
+      "volume": 0.65
+    },
+    "drift-boost-3": {
+      "files": [
+        "drift-boost-3.mp3"
+      ],
+      "volume": 0.7
+    },
+    "boost-pad": {
+      "files": [
+        "boost-pad.mp3"
+      ],
+      "volume": 0.6
+    },
+    "jump": {
+      "files": [
+        "jump.mp3"
+      ],
+      "volume": 0.5
+    },
+    "land": {
+      "files": [
+        "land-1.mp3",
+        "land-2.mp3"
+      ],
+      "volume": 0.6
+    },
+    "trick": {
+      "files": [
+        "trick.mp3"
+      ],
+      "volume": 0.55
+    },
+    "slipstream": {
+      "files": [
+        "slipstream.mp3"
+      ],
+      "volume": 0.45
+    },
+    "near-miss": {
+      "files": [
+        "near-miss.mp3"
+      ],
+      "volume": 0.5
+    },
+    "overtake": {
+      "files": [
+        "overtake.mp3"
+      ],
+      "volume": 0.45
+    },
+    "wall": {
+      "files": [
+        "wall-1.mp3",
+        "wall-2.mp3"
+      ],
+      "volume": 0.55
+    },
+    "bump": {
+      "files": [
+        "bump-1.mp3",
+        "bump-2.mp3"
+      ],
+      "volume": 0.55
+    },
+    "hit": {
+      "files": [
+        "hit-1.mp3",
+        "hit-2.mp3"
+      ],
+      "volume": 0.65
+    },
+    "pickup": {
+      "files": [
+        "pickup-1.mp3",
+        "pickup-2.mp3",
+        "pickup-3.mp3"
+      ],
+      "volume": 0.4
+    },
+    "jackpot": {
+      "files": [
+        "jackpot.mp3"
+      ],
+      "volume": 0.6
+    },
+    "item-get": {
+      "files": [
+        "item-get.mp3"
+      ],
+      "volume": 0.55
+    },
+    "item-boost": {
+      "files": [
+        "item-boost.mp3"
+      ],
+      "volume": 0.7
+    },
+    "shield": {
+      "files": [
+        "shield.mp3"
+      ],
+      "volume": 0.55
+    },
+    "shield-break": {
+      "files": [
+        "shield-break.mp3"
+      ],
+      "volume": 0.6
+    },
+    "poll": {
+      "files": [
+        "poll.mp3"
+      ],
+      "volume": 0.6
+    },
+    "magnet": {
+      "files": [
+        "magnet.mp3"
+      ],
+      "volume": 0.5
+    },
+    "leak": {
+      "files": [
+        "leak.mp3"
+      ],
+      "volume": 0.6
+    },
+    "filibuster": {
+      "files": [
+        "filibuster.mp3"
+      ],
+      "volume": 0.6
+    },
+    "spin": {
+      "files": [
+        "spin.mp3"
+      ],
+      "volume": 0.55
+    },
+    "budget": {
+      "files": [
+        "budget.mp3"
+      ],
+      "volume": 0.55
+    },
+    "noconf": {
+      "files": [
+        "noconf.mp3"
+      ],
+      "volume": 0.7
+    },
+    "warning": {
+      "files": [
+        "warning.mp3"
+      ],
+      "volume": 0.55
+    },
+    "confiscated": {
+      "files": [
+        "confiscated.mp3"
+      ],
+      "volume": 0.6
+    },
+    "veto": {
+      "files": [
+        "veto.mp3"
+      ],
+      "volume": 0.55
+    },
+    "warp": {
+      "files": [
+        "warp.mp3"
+      ],
+      "volume": 0.55
+    },
+    "ability-ready": {
+      "files": [
+        "ability-ready.mp3"
+      ],
+      "volume": 0.55
+    },
+    "ability-immunity": {
+      "files": [
+        "ability-immunity.mp3"
+      ],
+      "volume": 0.65
+    },
+    "ability-breaking": {
+      "files": [
+        "ability-breaking.mp3"
+      ],
+      "volume": 0.65
+    },
+    "ability-protest": {
+      "files": [
+        "ability-protest.mp3"
+      ],
+      "volume": 0.65
+    },
+    "ability-resign": {
+      "files": [
+        "ability-resign.mp3"
+      ],
+      "volume": 0.6
+    },
+    "ability-funds": {
+      "files": [
+        "ability-funds.mp3"
+      ],
+      "volume": 0.65
+    },
+    "ability-siren": {
+      "files": [
+        "ability-siren.mp3"
+      ],
+      "volume": 0.65
+    },
+    "lap": {
+      "files": [
+        "lap.mp3"
+      ],
+      "volume": 0.55
+    },
+    "final-lap": {
+      "files": [
+        "final-lap.mp3"
+      ],
+      "volume": 0.6
+    },
+    "finish-win": {
+      "files": [
+        "finish-win.mp3"
+      ],
+      "volume": 0.65
+    },
+    "finish-lose": {
+      "files": [
+        "finish-lose.mp3"
+      ],
+      "volume": 0.6
+    },
+    "ui-click": {
+      "files": [
+        "ui-click.mp3"
+      ],
+      "volume": 0.4
+    },
+    "ui-select": {
+      "files": [
+        "ui-select.mp3"
+      ],
+      "volume": 0.45
+    },
+    "race-start": {
+      "files": [
+        "race-start.mp3"
+      ],
+      "volume": 0.55
+    },
+    "coalition-join": {
+      "files": [
+        "coalition-join.mp3"
+      ],
+      "volume": 0.55
+    },
+    "coalition-reject": {
+      "files": [
+        "coalition-reject.mp3"
+      ],
+      "volume": 0.5
+    },
+    "gov-formed": {
+      "files": [
+        "gov-formed.mp3"
+      ],
+      "volume": 0.65
+    },
+    "gov-failed": {
+      "files": [
+        "gov-failed.mp3"
+      ],
+      "volume": 0.6
+    }
+  },
+  "voice": {
+    "הקריין איתכם": "voice-0.mp3",
+    "שלוש": "voice-1.mp3",
+    "שתיים": "voice-2.mp3",
+    "אחת": "voice-3.mp3",
+    "צא!": "voice-4.mp3",
+    "זינוק מושלם": "voice-5.mp3",
+    "מקום ראשון": "voice-6.mp3",
+    "הקפה אחרונה": "voice-7.mp3",
+    "נחיתה מושלמת": "voice-8.mp3",
+    "הצבעת אי־אמון נגדכם": "voice-9.mp3",
+    "סקר בדרך אליכם": "voice-10.mp3",
+    "ניצחון!": "voice-11.mp3",
+    "סיימתם במקום 2": "voice-12.mp3",
+    "סיימתם במקום 3": "voice-13.mp3",
+    "סיימתם במקום 4": "voice-14.mp3",
+    "סיימתם במקום 5": "voice-15.mp3",
+    "סיימתם במקום 6": "voice-16.mp3",
+    "הממשלה הוקמה": "voice-17.mp3",
+    "אין ממשלה": "voice-18.mp3"
+  }
+}

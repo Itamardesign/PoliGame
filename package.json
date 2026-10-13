@@ -9,6 +9,7 @@
     "check": "node -e \"for (const f of require('fs').readdirSync('dist').filter(f => f.endsWith('.js'))) require('child_process').execFileSync(process.execPath, ['--check', 'dist/' + f], { stdio: 'inherit' })\"",
     "format": "npx --yes prettier@3.3.3 --write \"dist/*.js\" \"dist/*.css\" \"tests/*.mjs\"",
     "test:browser": "node tests/browser.mjs",
-    "sim": "node tools/sim.mjs"
+    "sim": "node tools/sim.mjs",
+    "sfx": "node tools/gen-sfx.mjs"
   }
 }

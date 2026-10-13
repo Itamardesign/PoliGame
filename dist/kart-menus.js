@@ -1,14 +1,14 @@
 // Menus and between-race screens: garage, track picker, results, coalition talks, final count.
 import { PARTIES } from './race-model.js';
-import { ITEMS, ABILITIES, statBars } from './race-items.js';
+import { ITEMS, ABILITIES } from './race-items.js';
 import { LEVELS } from './kart-levels.js';
 import * as GP from './gp.js';
 import { chamberSVG } from './ui-chamber.js';
 import { icon } from './ui-icons.js';
 import { formatTime } from './kart-hud.js';
+import { FACES } from './kart-faces.js';
 
 const $ = id => document.getElementById(id);
-const STAT_NAMES = { speed: 'מהירות', accel: 'תאוצה', handling: 'שליטה', offroad: 'שטח', weight: 'משקל' };
 // What each vehicle is, plainly.
 export const RIDES = [
   'לימוזינה ממשלתית משוריינת',
@@ -18,6 +18,9 @@ export const RIDES = [
   'כרכרה מוזהבת עם כס מלכות',
   'ג׳יפ סיור 4×4 עם סירנה'
 ];
+
+// Driver cards use the same face photos as the 3D heads (already cropped ear to ear, hair to chin).
+const FACE_KEYS = Object.keys(FACES);
 
 export function renderDrivers(images, selected, onChoose) {
   const list = $('drivers');
@@ -29,7 +32,8 @@ export function renderDrivers(images, selected, onChoose) {
     b.setAttribute('aria-checked', String(i === selected));
     b.setAttribute('aria-label', `${p.leader} — ${p.name}`);
     b.style.setProperty('--party', p.color);
-    b.innerHTML = `<img src="${images[i]}" alt="">`;
+    b.style.setProperty('--i', i);
+    b.innerHTML = `<span class="driver-photo"><img src="./assets/faces/${FACE_KEYS[i]}.jpg" alt="" draggable="false"></span><span class="driver-name">${p.short}</span>`;
     b.onclick = () => onChoose(i);
     list.append(b);
   });
@@ -37,27 +41,25 @@ export function renderDrivers(images, selected, onChoose) {
 
 export function renderGarage(i) {
   const p = PARTIES[i],
-    bars = statBars(i);
+    card = $('garageCard');
+  $('home').style.setProperty('--party', p.color);
   $('garageLogo').src = './assets/' + p.logo;
   $('garageLogo').alt = 'סמל ' + p.name;
   $('garageLeader').textContent = p.leader;
   $('garageRide').textContent = `${p.ride} · ${RIDES[i]}`;
-  $('garageStats').style.setProperty('--party', p.color);
-  $('garageStats').innerHTML = Object.entries(STAT_NAMES)
-    .map(
-      ([k, label]) =>
-        `<dt>${label}</dt><dd aria-label="${label} ${bars[k]} מתוך 5">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= bars[k] ? 'on' : ''}"></i>`).join('')}</dd>`
-    )
-    .join('');
   $('garageAbility').textContent = ABILITIES[i].name;
   $('garageAbilityHint').textContent = ABILITIES[i].hint;
   [...$('drivers').children].forEach((b, j) => b.setAttribute('aria-checked', String(j === i)));
+  // Replay the entrance animation on every pick.
+  card.classList.remove('swap');
+  void card.offsetWidth;
+  card.classList.add('swap');
 }
 
 export function renderTracks(current, onPick) {
   $('trackPicker').innerHTML = LEVELS.map(
     l =>
-      `<button class="track" role="radio" data-level="${l.id}" aria-checked="${l.id === current}" style="--track-color:${l.color}"><b>${l.name}</b><small>${l.subtitle}</small><span class="cc">${l.speed}</span></button>`
+      `<button class="track" data-level="${l.id}" aria-current="${l.id === current}" style="--track-color:${l.color}"><b>${l.name}</b><small>${l.subtitle}</small><span class="cc">${l.speed}</span></button>`
   ).join('');
   for (const b of $('trackPicker').children) b.onclick = () => onPick(b.dataset.level);
 }
@@ -85,10 +87,6 @@ export function renderResults({
   level,
   gp,
   gained,
-  mode,
-  newRecord,
-  previous,
-  daily
 }) {
   const me = race.racers[0];
   const titles = gp
@@ -96,22 +94,11 @@ export function renderResults({
     : ['ניצחתם', 'מקום שני', 'מקום שלישי', 'מקום רביעי', 'מקום חמישי', 'מקום אחרון'];
   $('resultKicker').textContent = gp
     ? `המרוץ ל־61 · מרוץ ${gp.history.length} מתוך ${GP.GP_RACES.length} · ${level.name}`
-    : mode === 'trial'
-      ? `נגד השעון · ${level.name}`
-      : mode === 'daily'
-        ? `אתגר יומי · ${daily.label} · ${level.name}`
-        : `${level.name} · ${level.speed}`;
-  $('resultTitle').textContent =
-    mode === 'trial' ? (newRecord ? 'שיא חדש' : formatTime(me.finish)) : titles[place - 1];
+    : `${level.name} · ${level.speed}`;
+  $('resultTitle').textContent = titles[place - 1];
   let line;
   if (gp)
     line = `${gained[me.id]} מנדטים במרוץ הזה. לקואליציה שלכם יש עכשיו ${GP.coalitionSeats(gp)} מתוך 61 הדרושים.`;
-  else if (mode === 'trial')
-    line = newRecord
-      ? previous
-        ? `${formatTime(me.finish)} — ${(previous - me.finish).toFixed(2)} שניות מהר מהשיא הקודם. הרוח החדשה נשמרה.`
-        : `${formatTime(me.finish)}. הרוח שלכם נשמרה — בפעם הבאה תתחרו בה.`
-      : `${(me.finish - previous).toFixed(2)} שניות אחרי השיא שלכם (${formatTime(previous)}).`;
   else if (place === 1)
     line = `${formatTime(me.finish)} — ${((order[1].finish ?? order[1].projected) - me.finish).toFixed(2)} שניות לפני ${PARTIES[order[1].id].short}.`;
   else

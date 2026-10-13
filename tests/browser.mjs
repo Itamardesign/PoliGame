@@ -74,11 +74,11 @@ const check = async (name, fn) => {
 };
 
 try {
-  await check('title screen offers four modes and six drivers', async () => {
+  await check('title screen offers two race buttons and six drivers', async () => {
     const page = await open({ width: 1440, height: 900 });
     await page.goto(BASE + '/?qa=1');
     await ready(page);
-    assert.equal(await page.locator('.mode').count(), 4);
+    assert.equal(await page.locator('.cta-buttons .cta').count(), 2);
     assert.equal(await page.locator('#drivers .driver').count(), 6);
     await page.locator('#drivers .driver').nth(2).click();
     assert.equal(await page.locator('#garageLeader').textContent(), 'יאיר גולן');
@@ -91,7 +91,8 @@ try {
     await page.addInitScript(() => localStorage.setItem('ck-mode', 'single'));
     await page.goto(BASE + '/?level=jerusalem');
     await ready(page);
-    await page.locator('#play').click();
+    await page.locator('#single').click();
+    await page.locator('#trackPicker [data-level="jerusalem"]').click();
     await race(page);
     await page.screenshot({ path: `${out}/single-results.png` });
     const rows = await page.locator('#resultsBoard li').allTextContents();
@@ -173,21 +174,6 @@ try {
     await page.close();
   });
 
-  await check('a time trial saves a ghost the next run races against', async () => {
-    const page = await open({ width: 1280, height: 800 });
-    await page.addInitScript(() => localStorage.setItem('ck-mode', 'trial'));
-    await page.goto(BASE + '/?level=jerusalem');
-    await ready(page);
-    await page.evaluate(() => localStorage.removeItem('ck-ghost-jerusalem'));
-    await page.locator('#play').click();
-    await race(page);
-    assert.equal(await page.locator('#resultTitle').textContent(), 'שיא חדש');
-    assert.ok(
-      await page.evaluate(() => JSON.parse(localStorage.getItem('ck-ghost-jerusalem')).frames.length > 500)
-    );
-    await page.close();
-  });
-
   await check('phone layout keeps the start button and touch controls on screen', async () => {
     const page = await open(
       { width: 390, height: 844 },
@@ -196,9 +182,10 @@ try {
     await page.addInitScript(() => localStorage.setItem('ck-mode', 'single'));
     await page.goto(BASE + '/?level=jerusalem');
     await ready(page);
-    const box = await page.locator('#play').boundingBox();
+    const box = await page.locator('#single').boundingBox();
     assert.ok(box && box.y + box.height <= 844, 'start button visible');
-    await page.locator('#play').tap();
+    await page.locator('#single').tap();
+    await page.locator('#trackPicker [data-level="jerusalem"]').tap();
     await page.waitForFunction(() => ['intro', 'countdown', 'running'].includes(readKartState().state));
     await page.locator('#steerZone').tap();
     await page.waitForFunction(() => readKartState().state === 'running', null, { timeout: 20000 });

@@ -9,31 +9,51 @@
       name="description"
       content="מרוץ קארטינג סאטירי בתלת־ממד: שישה מנהיגים, שלושה מסלולים, 120 מנדטים — ומי שמרכיב 61 מקים ממשלה."
     />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1422'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-family='Arial' font-weight='900' font-size='34' fill='%23f2c14e'%3E61%3C/text%3E%3C/svg%3E"
-    />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="./icons/favicon-64.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="קואליציה קארט" />
     <link rel="stylesheet" href="./fonts.css" />
     <link rel="stylesheet" href="./kart.css" />
+    <link rel="stylesheet" href="./home.css" />
+    <link rel="preload" as="image" href="./assets/loading-art.jpg" />
   </head>
   <body>
     <main id="arena" class="arena">
       <canvas id="game" tabindex="0" aria-label="מסלול המרוץ"></canvas>
       <div class="vignette" aria-hidden="true"></div>
       <div id="loading" class="loading" role="status">
-        <span class="loading-mark">61</span>
-        <span>טוענים את המסלול…</span>
+        <div class="load-art" aria-hidden="true"></div>
+        <div class="load-rays" aria-hidden="true"></div>
+        <div class="load-streaks" aria-hidden="true"></div>
+        <div class="load-shade" aria-hidden="true"></div>
+        <div class="load-content">
+          <div class="logo" aria-hidden="true">
+            <span class="logo-top">קואליציה</span>
+            <span class="logo-main">קארט</span>
+            <span class="logo-seal">61</span>
+          </div>
+          <div class="load-bar" aria-hidden="true">
+            <span class="load-fill"><i class="load-head"></i></span>
+            <span class="load-finish"></span>
+          </div>
+          <span class="load-text">מחממים מנועים · טוענים את המסלול…</span>
+        </div>
       </div>
 
       <!-- Title screen -->
       <section id="home" class="home" aria-label="מסך פתיחה">
+        <div class="home-bg" aria-hidden="true">
+          <div class="bg-rays"></div>
+          <div class="bg-shade"></div>
+        </div>
+
         <header class="home-bar">
-          <div class="wordmark" aria-label="קואליציה קארט">
-            <span class="wordmark-seal">61</span>
-            <span class="wordmark-name">קואליציה<b>קארט</b></span>
-          </div>
+          <button id="help" class="icon-button" aria-label="איך משחקים" title="איך משחקים">?</button>
           <div class="home-tools">
-            <button id="help" class="icon-button" aria-label="איך משחקים" title="איך משחקים">?</button>
             <button id="sound" class="icon-button" aria-label="הפעלת צליל" aria-pressed="false" title="צליל">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 9h4l5-4v14l-5-4H4z" />
@@ -48,73 +68,62 @@
           </div>
         </header>
 
-        <div class="home-panel">
-          <div id="resumeCard" class="resume-card hidden">
-            <div>
-              <small>המרוץ ל־61 בעיצומו</small>
-              <b id="resumeTitle"></b>
-            </div>
-            <button id="resumeSeason" class="primary small">המשך</button>
-            <button id="abandonSeason" class="text-button">עונה חדשה</button>
-          </div>
-
-          <div class="mode-list" role="radiogroup" aria-label="מצב משחק">
-            <button class="mode" data-mode="gp" role="radio" aria-checked="true">
-              <span class="mode-index">01</span>
-              <span class="mode-copy">
-                <b>המרוץ ל־61</b>
-                <small>שלושה מרוצים, 120 מנדטים. בין מרוץ למרוץ מרכיבים קואליציה.</small>
-              </span>
-            </button>
-            <button class="mode" data-mode="single" role="radio" aria-checked="false">
-              <span class="mode-index">02</span>
-              <span class="mode-copy">
-                <b>מרוץ בודד</b>
-                <small>מסלול אחד, שלוש הקפות, שישה נהגים.</small>
-              </span>
-            </button>
-            <button class="mode" data-mode="trial" role="radio" aria-checked="false">
-              <span class="mode-index">03</span>
-              <span class="mode-copy">
-                <b>נגד השעון</b>
-                <small>לבד על המסלול, מול רוח השיא שלכם.</small>
-              </span>
-            </button>
-            <button class="mode" data-mode="daily" role="radio" aria-checked="false">
-              <span class="mode-index">04</span>
-              <span class="mode-copy">
-                <b>אתגר יומי</b>
-                <small id="dailyInfo">מסלול ונהג קבועים לכולם, כל יום אחרים.</small>
-              </span>
-            </button>
-          </div>
-
-          <div id="trackPicker" class="track-picker hidden" role="radiogroup" aria-label="בחירת מסלול"></div>
-
-          <button id="play" class="primary play" disabled>
-            <span id="playLabel">לזינוק</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-          </button>
+        <div class="home-hero">
+          <h1 class="logo" aria-label="קואליציה קארט">
+            <span class="logo-top" aria-hidden="true">קואליציה</span>
+            <span class="logo-main" aria-hidden="true">קארט</span>
+            <span class="logo-seal" aria-hidden="true">61</span>
+          </h1>
         </div>
 
-        <aside class="garage" aria-label="בחירת נהג">
-          <div class="garage-card">
-            <div class="garage-head">
-              <img id="garageLogo" class="garage-logo" alt="" />
-              <div>
-                <h2 id="garageLeader"></h2>
+        <div class="home-bottom">
+          <aside class="garage" aria-label="בחירת נהג">
+            <div class="driver-pick">
+              <button id="prevDriver" class="nav-arrow" aria-label="הנהג הקודם">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+              </button>
+              <div id="garageCard" class="driver-info" aria-live="polite">
+                <h2><img id="garageLogo" class="garage-logo" alt="" /><span id="garageLeader"></span></h2>
                 <p id="garageRide"></p>
+                <p class="ability-line"><b id="garageAbility"></b><span id="garageAbilityHint"></span></p>
               </div>
+              <button id="nextDriver" class="nav-arrow" aria-label="הנהג הבא">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+              </button>
             </div>
-            <dl id="garageStats" class="stat-bars"></dl>
-            <div class="garage-ability">
-              <small>יכולת מיוחדת</small>
-              <b id="garageAbility"></b>
-              <span id="garageAbilityHint"></span>
+            <div id="drivers" class="drivers" role="radiogroup" aria-label="נהגים"></div>
+          </aside>
+
+          <div class="home-cta">
+            <div id="resumeCard" class="resume-card hidden">
+              <div>
+                <small>המרוץ ל־61 בעיצומו</small>
+                <b id="resumeTitle"></b>
+              </div>
+              <button id="resumeSeason" class="primary small">המשך</button>
+              <button id="abandonSeason" class="text-button">עונה חדשה</button>
+            </div>
+            <div class="cta-buttons">
+              <button id="play" class="cta cta-gp" disabled>
+                <span id="playLabel">המרוץ ל־61</span><span class="cta-shine" aria-hidden="true"></span>
+              </button>
+              <button id="single" class="cta cta-single">
+                <span>מרוץ בודד</span><span class="cta-shine" aria-hidden="true"></span>
+              </button>
             </div>
           </div>
-          <div id="drivers" class="drivers" role="radiogroup" aria-label="נהגים"></div>
-        </aside>
+        </div>
+
+        <div id="trackSheet" class="track-sheet hidden" role="dialog" aria-label="בחירת מסלול">
+          <div class="track-panel">
+            <div class="track-sheet-head">
+              <b>בחרו מסלול</b>
+              <button id="trackBack" class="icon-button" aria-label="סגירה">×</button>
+            </div>
+            <div id="trackPicker" class="track-picker" role="group" aria-label="מסלולים"></div>
+          </div>
+        </div>
+
         <footer class="home-foot">
           <button id="credits" class="text-button">מקורות וזכויות</button>
           <span>משחק סאטירי עצמאי. הדמויות הן קריקטורות והתוצאות בדיוניות.</span>
@@ -279,7 +288,6 @@
           </dl>
           <div class="actions">
             <button id="again" class="primary">עוד מרוץ</button>
-            <button id="share" class="secondary hidden">שיתוף התוצאה</button>
             <button id="homeButton" class="secondary">לתפריט</button>
           </div>
         </div>
@@ -339,5 +347,6 @@
       <div id="infoContent"></div>
     </dialog>
     <script type="module" src="./kart.js"></script>
+    <script type="module" src="./pwa.js"></script>
   </body>
 </html>

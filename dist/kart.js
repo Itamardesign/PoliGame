@@ -30,8 +30,7 @@ import { makeEffects } from './kart-effects.js';
 import { animateKart, resetMotion } from './kart-motion.js';
 import { makeTrails } from './kart-trails.js';
 import { KEY_ACTIONS, readControls } from './kart-input.js';
-import { LEVELS, levelById } from './kart-levels.js';
-import { makeRecorder, sampleGhost, loadGhost } from './ghost.js';
+import { levelById } from './kart-levels.js';
 import { makeHud, formatTime } from './kart-hud.js';
 import { makeAudio } from './kart-audio.js';
 import { makeTouchControls } from './kart-touch.js';
@@ -70,29 +69,12 @@ const save = (key, value) => {
 };
 const params = new URLSearchParams(location.search);
 let gp = GP.restore(stored('ck-gp', ''));
-const MODES = ['gp', 'single', 'trial', 'daily'];
+const MODES = ['gp', 'single'];
 let mode = params.get('mode') ?? (params.get('gp') === '1' ? 'gp' : stored('ck-mode', 'gp'));
 if (!MODES.includes(mode)) mode = 'gp';
-// The daily challenge: one course, one driver and one starting field per calendar day.
-const today = new Date(),
-  dailyKey = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`,
-  dailyHash = [...dailyKey].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7);
-const DAILY = {
-  key: dailyKey,
-  label: `${today.getDate()}.${today.getMonth() + 1}`,
-  level: LEVELS[dailyHash % LEVELS.length].id,
-  driver: (dailyHash >>> 3) % 6,
-  seed: Number(dailyKey)
-};
-// Grand Prix and daily races run on their own course; otherwise the URL picks it.
+// Grand Prix races run on their own course; otherwise the URL picks it.
 const going = params.get('go') === '1';
-const level = levelById(
-  going && mode === 'gp' && gp && !gp.done
-    ? GP.currentLevel(gp)
-    : going && mode === 'daily'
-      ? DAILY.level
-      : params.get('level')
-);
+const level = levelById(going && mode === 'gp' && gp && !gp.done ? GP.currentLevel(gp) : params.get('level'));
 arena.classList.add('level-' + level.id);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const touchDevice = () => matchMedia('(pointer:coarse)').matches;
@@ -155,14 +137,6 @@ let selected = clamp(Number(stored('ck-driver', '0')) || 0, 0, PARTIES.length - 
   hudClock = 0,
   lastLap = 0,
   playerHits = {},
-  recorder = null,
-  ghost = null,
-  ghostKart = null,
-  lapTimes = [],
-  lapStart = 0,
-  newRecord = false,
-  shareText = '',
-  ghostRecord = null,
   stateBeforePause = 'running',
   introT = 0,
   finishT = 0,
@@ -179,8 +153,22 @@ const syncControls = () => Object.assign(controls, readControls(heldKeys, touchK
 // Audio: cues, engine, music and the optional announcer all live in kart-audio.js.
 const audio = makeAudio();
 const tone = (...args) => audio.tone(...args);
+// A recorded sound by name, or the synthesized blip in fallback while it hasn't loaded.
+const cue = (name, ...fallback) => audio.cue(name, fallback);
+const ITEM_SOUNDS = {
+  boost: 'item-boost',
+  shield: 'shield',
+  poll: 'poll',
+  magnet: 'magnet',
+  leak: 'leak',
+  filibuster: 'filibuster',
+  spin: 'spin',
+  budget: 'budget',
+  noconf: 'noconf'
+};
+const COUNT_WORDS = ['אחת', 'שתיים', 'שלוש'];
 let musicOn = stored('ck-music', 'on') === 'on',
-  voiceOn = stored('ck-voice', 'off') === 'on';
+  voiceOn = stored('ck-voice', 'on') === 'on';
 audio.setMusic(musicOn);
 audio.setVoice(voiceOn);
 function setSound(on) {
@@ -190,7 +178,7 @@ function setSound(on) {
   $('sound').setAttribute('aria-pressed', String(on));
   $('sound').setAttribute('aria-label', on ? 'כיבוי צליל' : 'הפעלת צליל');
   $('soundToggle').checked = on;
-  tone(600, 0.14);
+  cue('ui-click', 600, 0.14);
 }
 const pulse = (pattern = 16) => touchDevice() && navigator.vibrate?.(pattern);
 function toast(message) {
@@ -436,46 +424,29 @@ function clearControls() {
 // ——— Title screen ———
 function choose(i) {
   if (mode === 'gp' && gp && !gp.done && gp.round > 0) return toast('בעונה פעילה אי אפשר להחליף נהג');
-  if (mode === 'daily') return toast('באתגר היומי הנהג קבוע לכולם');
   const changed = selected !== i;
   selected = i;
   save('ck-driver', i);
   renderGarage(i);
   $('driverFace').src = faceImages[i];
   if (changed) pulse(20);
-  tone(380 + i * 60, 0.08);
+  cue('ui-select', 380 + i * 60, 0.08);
 }
 function setMode(next) {
   mode = next;
   save('ck-mode', next);
-  for (const b of document.querySelectorAll('.mode'))
-    b.setAttribute('aria-checked', String(b.dataset.mode === next));
-  $('trackPicker').classList.toggle('hidden', next !== 'single' && next !== 'trial');
-  $('playLabel').textContent = {
-    gp: 'מתחילים עונה',
-    single: 'לזינוק',
-    trial: 'נגד השעון',
-    daily: 'לאתגר של היום'
-  }[next];
-  // The daily challenge shows its fixed driver; other modes show the player's own choice.
-  const shown = next === 'daily' ? DAILY.driver : Number(stored('ck-driver', '0')) || 0;
-  if (next === 'daily' || selected !== shown) {
-    selected = shown;
-    renderGarage(shown);
-    $('driverFace').src = faceImages[shown];
-  }
-  const best = stored('ck-daily-' + DAILY.key, '');
-  $('dailyInfo').textContent =
-    `${levelById(DAILY.level).name} · ${PARTIES[DAILY.driver].leader}${best ? ' · היום: מקום ' + best : ''}`;
+}
+// The two big title buttons: the Grand Prix starts at once, a single race asks for a course first.
+function showTrackSheet(open) {
+  $('trackSheet').classList.toggle('hidden', !open);
+  $('home').classList.toggle('picking-track', open);
+  if (open) $('trackPicker').querySelector('[aria-current="true"]')?.focus({ preventScroll: true });
+  else $('single').focus({ preventScroll: true });
+  cue('ui-select', open ? 520 : 420, 0.08);
 }
 function pickTrack(id) {
-  if (id === level.id) return;
-  const url = new URL(location.href);
-  url.searchParams.set('level', id);
-  url.searchParams.set('mode', mode);
-  url.searchParams.delete('gp');
-  url.searchParams.delete('go');
-  location.replace(url.href);
+  setMode('single');
+  goToRace(id, 'single');
 }
 // Moving between courses reloads the page (each course builds its own world).
 function goToRace(levelId, raceMode) {
@@ -493,8 +464,7 @@ function refreshResumeCard() {
       `${PARTIES[gp.player].short} · מרוץ ${gp.round + 1} מתוך ${GP.GP_RACES.length}, ${GP.coalitionSeats(gp)} מנדטים`;
 }
 function play() {
-  if (mode === 'single' || mode === 'trial') return startRace_();
-  if (mode === 'daily') return goToRace(DAILY.level, 'daily');
+  setMode('gp');
   if (!gp || gp.done || gp.player !== selected || gp.round === 0) {
     gp = GP.newGrandPrix(selected);
     saveGp();
@@ -516,34 +486,15 @@ function startRace_() {
   launchPressed = 99;
   playerHits = {};
   lastLap = 0;
-  const inGp = mode === 'gp' && gp && !gp.done,
-    trial = mode === 'trial',
-    daily = mode === 'daily';
-  if (daily) selected = DAILY.driver;
-  race = makeRace(
-    selected,
-    level.difficulty,
-    daily ? DAILY.seed : Date.now(),
-    track.length,
-    track.shortcuts,
-    level.id,
-    {
-      bend,
-      height,
-      walls,
-      ...(inGp ? GP.raceOptions(gp) : {}),
-      ...(trial ? { solo: true } : {})
-    }
-  );
+  const inGp = mode === 'gp' && gp && !gp.done;
+  race = makeRace(selected, level.difficulty, Date.now(), track.length, track.shortcuts, level.id, {
+    bend,
+    height,
+    walls,
+    ...(inGp ? GP.raceOptions(gp) : {})
+  });
   karts.forEach((k, i) => (k.visible = race.racers.some(r => r.id === i)));
   $('fieldSize').textContent = '/' + race.racers.length;
-  $('leaderboard').classList.toggle('hidden', trial);
-  // Time trial: record this run and race last best's ghost.
-  recorder = trial ? makeRecorder(track.shortcuts) : null;
-  ghost = trial ? loadGhost(stored, level.id) : null;
-  lapTimes = [];
-  lapStart = 0;
-  setupGhostKart();
   karts.forEach(resetMotion);
   karts.forEach(k => k.scale.setScalar(1));
   state = reduced ? 'countdown' : 'intro';
@@ -579,12 +530,10 @@ function startRace_() {
   updateKarts(0);
   updateHUD();
   setCamera(true);
-  tone(550, 0.15);
+  cue('grid-rev', 550, 0.15);
 }
 function goHome() {
   fx.reset();
-  if (ghostKart) ghostKart.visible = false;
-  $('leaderboard').classList.remove('hidden');
   clearDrops();
   arena.classList.remove(
     'boosting',
@@ -601,7 +550,8 @@ function goHome() {
   clearControls();
   for (const id of ['hud', 'results', 'pauseScreen', 'countdown', 'touch', 'talks', 'final'])
     $(id).classList.add('hidden');
-  $('home').classList.remove('hidden');
+  $('home').classList.remove('hidden', 'picking-track');
+  $('trackSheet').classList.add('hidden');
   karts.forEach(k => {
     k.userData.name.visible = false;
     k.userData.shield.visible = false;
@@ -672,6 +622,11 @@ function consumeEvents() {
       const kart = karts[e.id];
       if (e.type === 'land') trails.puff(kart.position, '#d9ccad', e.trick ? 18 : 10, e.trick ? 5 : 3.5);
       if (e.type === 'hit') trails.puff(kart.position.clone().setY(kart.position.y + 0.8), '#f1d9c2', 16, 5);
+      if (!e.player && e.target !== selected && Math.abs(e.s - race.racers[0].s) < 40) {
+        if (e.type === 'hit') audio.play('hit', { volume: 0.35 });
+        if (e.type === 'ram' || e.type === 'bump') audio.play('bump', { volume: 0.35 });
+        if (e.type === 'ability') audio.play('ability-' + e.ability, { volume: 0.4 });
+      }
     }
     hud.onEvent(e, race, elapsed);
     // Friendly fire counts against coalition loyalty.
@@ -682,9 +637,13 @@ function consumeEvents() {
         playerHits[victim] = (playerHits[victim] ?? 0) + 1;
     }
     if ((e.type === 'noconf-fired' || e.type === 'poll-fired') && e.target === selected) {
-      callout(e.type === 'noconf-fired' ? 'הצבעת אי־אמון נגדכם' : 'סקר בדרך אליכם', 'danger');
-      tone(200, 0.3, 'square');
+      const line = e.type === 'noconf-fired' ? 'הצבעת אי־אמון נגדכם' : 'סקר בדרך אליכם';
+      callout(line, 'danger');
+      cue('warning', 200, 0.3, 'square');
+      audio.say(line, { important: false });
     }
+    if ((e.type === 'ram' || e.type === 'bump') && (e.player || e.target === selected))
+      cue('bump', 160, 0.12, 'square');
     if (!e.player) continue;
     const c = PLAYER_CALLOUTS[e.type];
     if (c) {
@@ -694,44 +653,65 @@ function consumeEvents() {
           : c[0],
         c[1]
       );
-      tone(e.type === 'ability-ready' ? 980 : 750, 0.18);
+      const named = {
+        'ability-ready': 'ability-ready',
+        'launch-boost': 'launch-boost',
+        'shield-break': 'shield-break',
+        jackpot: 'jackpot',
+        slipstream: 'slipstream',
+        leaked: 'leak',
+        spun: 'spin',
+        warp: 'warp',
+        veto: 'veto',
+        cleared: 'hit'
+      }[e.type];
+      if (named) cue(named, e.type === 'ability-ready' ? 980 : 750, 0.18);
+      else tone(e.type === 'ability-ready' ? 980 : 750, 0.18);
+      if (e.type === 'launch-boost') audio.say('זינוק מושלם', { important: false });
     }
     if (e.type === 'ability') {
       callout(ABILITIES[selected].name, 'gold');
-      tone(1200, 0.3);
+      cue('ability-' + e.ability, 1200, 0.3);
     }
-    if (e.type === 'pickup') tone(900, 0.05);
+    if (e.type === 'pickup') cue('pickup', 900, 0.05);
     if (e.type === 'confiscated') {
       callout('ועדת הבחירות החרימה את האביזר', 'danger');
-      tone(260, 0.3, 'square');
+      cue('confiscated', 260, 0.3, 'square');
       pulse([30, 40, 30]);
     }
     if (e.type === 'ballots-lost') {
       toast(`איבדתם ${e.count} פתקים`);
       pulse([15, 30, 15]);
     }
-    if (e.type === 'boost-pad') tone(840, 0.18);
+    if (e.type === 'boost-pad') cue('boost-pad', 840, 0.18);
     if (e.type === 'item-get') {
-      tone(570, 0.12);
+      cue('item-get', 570, 0.12);
       pulse(40);
     }
-    if (e.type === 'item-use') tone(e.item === 'boost' ? 880 : 550, 0.2);
+    if (e.type === 'item-use') cue(ITEM_SOUNDS[e.item], e.item === 'boost' ? 880 : 550, 0.2);
     if (e.type === 'hit') {
       callout(e.cause === 'barrier' ? 'מחסום' : e.cause === 'noconf' ? 'אי־אמון' : 'ספין', 'danger');
-      tone(130, 0.24, 'sawtooth');
+      cue('hit', 130, 0.24, 'sawtooth');
       pulse([40, 30, 40]);
     }
     if (e.type === 'drift-boost') {
-      tone(700 + e.tier * 160, 0.16);
+      cue('drift-boost-' + Math.min(3, Math.max(1, e.tier)), 700 + e.tier * 160, 0.16);
       pulse(18 + e.tier * 8);
     }
-    if (e.type === 'wall') pulse(20);
+    if (e.type === 'wall') {
+      pulse(20);
+      audio.play('wall');
+    }
+    if (e.type === 'drift-start') audio.play('drift-start');
+    if (e.type === 'near-miss') audio.play('near-miss');
+    if (e.type === 'land') audio.play('land', { volume: e.trick ? 1 : 0.7 });
     if (e.type === 'land') pulse(e.trick ? [12, 20, 24] : 14);
     if (e.type === 'land' && e.trick) {
       callout('נחיתה מושלמת', 'gold');
-      tone(1100, 0.22);
+      cue('trick', 1100, 0.22);
+      audio.say('נחיתה מושלמת', { important: false });
     }
-    if (e.type === 'jump') tone(680, 0.16);
+    if (e.type === 'jump') cue('jump', 680, 0.16);
   }
 }
 
@@ -761,21 +741,6 @@ function finish() {
     gp.talksPending = !gp.done;
     saveGp();
   }
-  newRecord = false;
-  if (mode === 'trial' && recorder) {
-    const previous = ghost?.time;
-    if (!ghost || player.finish < ghost.time) {
-      newRecord = true;
-      save('ck-ghost-' + level.id, JSON.stringify(recorder.finish(player.finish, selected, lapTimes)));
-    }
-    ghostRecord = previous;
-  }
-  if (mode === 'daily') {
-    const prev = Number(stored('ck-daily-' + DAILY.key, '0'));
-    if (!prev || place < prev) save('ck-daily-' + DAILY.key, place);
-    shareText = `קואליציה קארט · אתגר יומי ${DAILY.label} · ${level.name} · ${PARTIES[selected].leader} · מקום ${place} · ${formatTime(player.finish)}`;
-  }
-  $('share').classList.toggle('hidden', mode !== 'daily');
   renderResults({
     race,
     order,
@@ -785,15 +750,12 @@ function finish() {
     level,
     gp: inGp ? gp : null,
     gained,
-    mode,
-    newRecord,
-    previous: ghostRecord,
-    daily: DAILY
+    mode
   });
   $('again').textContent = inGp ? (gp.done ? 'לספירת המנדטים' : 'למשא ומתן') : 'עוד מרוץ';
   $('homeButton').textContent = 'לתפריט';
   $('results').classList.remove('hidden');
-  tone(place === 1 ? 1000 : 360, 0.5);
+  if (place > 3) cue('finish-lose', 360, 0.5);
   if (place === 1 && !reduced) {
     const origin = karts[selected].position;
     for (let i = 0; i < 65; i++) {
@@ -840,14 +802,14 @@ function showTalks() {
       onInvite: id => {
         if (GP.invite(gp, id)) {
           saveGp();
-          tone(880, 0.15);
+          cue('coalition-join', 880, 0.15);
           draw();
         }
       },
       onDismiss: id => {
         GP.dismiss(gp, id);
         saveGp();
-        tone(300, 0.15);
+        cue('coalition-reject', 300, 0.15);
         draw();
       }
     });
@@ -866,39 +828,15 @@ function showFinal() {
   for (const id of ['results', 'hud', 'touch', 'talks']) $(id).classList.add('hidden');
   $('final').classList.remove('hidden');
   const v = renderFinal(gp);
-  tone(v.formed ? 1200 : 220, 0.6);
+  cue(v.formed ? 'gov-formed' : 'gov-failed', v.formed ? 1200 : 220, 0.6);
+  audio.say(v.formed ? 'הממשלה הוקמה' : 'אין ממשלה');
   $('newSeason').focus({ preventScroll: true });
 }
 
 // ——— Karts and camera ———
-function setupGhostKart() {
-  if (ghostKart) {
-    scene.remove(ghostKart);
-    ghostKart = null;
-  }
-  if (!ghost) return;
-  ghostKart = prepareKart(makeKart(ghost.party, logos));
-  ghostKart.traverse(m => {
-    if (!m.isMesh) return;
-    m.material = m.material.clone();
-    m.material.transparent = true;
-    m.material.opacity = 0.36;
-    m.material.depthWrite = false;
-    m.castShadow = false;
-  });
-  ghostKart.userData.name.visible = false;
-  scene.add(ghostKart);
-}
-function updateGhost(dt, ctx) {
-  if (!ghostKart || !race) return;
-  const g = sampleGhost(ghost, race.time, track.shortcuts);
-  ghostKart.visible = !!g && !(g.finished && race.time > ghost.time + 2) && state !== 'home';
-  if (g) animateKart(ghostKart, g, racerFrame(track, g), dt, ctx);
-}
 function updateKarts(dt) {
   if (!race) return;
   const ctx = { elapsed, reduced, camera };
-  updateGhost(dt, ctx);
   for (const r of race.racers) {
     const kart = karts[r.id];
     animateKart(kart, r, racerFrame(track, r), dt, ctx);
@@ -1047,19 +985,8 @@ function updateHUD() {
     coalitionSeats: gp ? GP.coalitionSeats(gp) : 0,
     now: elapsed
   });
-  // Time trial: live gap to the ghost, in seconds at the current pace.
-  if (mode === 'trial' && ghost) {
-    const g = sampleGhost(ghost, race.time, track.shortcuts),
-      p = race.racers[0];
-    if (g && !g.finished) {
-      const gap = (g.s - p.s) / Math.max(p.speed, 20);
-      $('coalitionMeter').classList.remove('hidden');
-      $('coalitionMeter').textContent = `מול השיא ${gap > 0 ? '+' : '−'}${Math.abs(gap).toFixed(2)}`;
-      $('coalitionMeter').style.color = gap > 0 ? '#ff8a8a' : '#4cc38a';
-    }
-  } else $('coalitionMeter').style.color = '';
   if (position < previousRank && race.time > 4 && state === 'running') {
-    tone(700, 0.07);
+    cue('overtake', 700, 0.07);
     if (position === 1) {
       callout('מקום ראשון', 'gold');
       audio.say('מקום ראשון');
@@ -1102,7 +1029,8 @@ function frame(now) {
     $('countdown').textContent = count > 0.5 ? Math.ceil(count - 0.5) : 'צא!';
     arena.classList.toggle('launch-window', count <= 1.5 && count > 0.45);
     if (Math.ceil(count) !== old) {
-      tone(count > 0.5 ? 540 : 1000, 0.12);
+      cue(count > 0.5 ? 'countdown-beep' : 'countdown-go', count > 0.5 ? 540 : 1000, 0.12);
+      audio.say(count > 0.5 ? COUNT_WORDS[Math.ceil(count - 0.5) - 1] : 'צא!', { important: false });
       pulse(count > 0.5 ? 18 : 35);
     }
     if (count <= 0) {
@@ -1139,24 +1067,14 @@ function frame(now) {
     bumpRivals(race);
     syncPickups();
     consumeEvents();
-    recorder?.record(p, race.time);
     const lap = Math.floor(Math.max(0, p.s) / track.length);
     if (lap > lastLap) {
       lastLap = lap;
-      lapTimes.push(race.time - lapStart);
-      lapStart = race.time;
-      const split = lapTimes.at(-1),
-        ref = ghost?.laps?.[lap - 1];
-      if (mode === 'trial')
-        callout(
-          `הקפה ${lap} · ${formatTime(split)}${ref ? ' (' + (split - ref > 0 ? '+' : '−') + Math.abs(split - ref).toFixed(2) + ')' : ''}`,
-          ref && split < ref ? 'gold' : ''
-        );
-      else if (!race.done) {
+      if (!race.done) {
         callout(lap === 2 ? 'הקפה אחרונה' : 'הקפה 2', lap === 2 ? 'gold' : '');
         if (lap === 2) audio.say('הקפה אחרונה');
       }
-      tone(850, 0.25);
+      cue(lap === 2 ? 'final-lap' : 'lap', 850, 0.25);
     }
     if (race.time > 7) $('raceHint').classList.add('hidden');
     if (race.done) {
@@ -1167,7 +1085,7 @@ function frame(now) {
       audio.say(place === 1 ? 'ניצחון!' : 'סיימתם במקום ' + place);
       arena.classList.add('cinematic');
       $('touch').classList.add('hidden');
-      tone(place === 1 ? 1000 : 600, 0.4);
+      cue(place <= 3 ? 'finish-win' : 'lap', place === 1 ? 1000 : 600, 0.4);
     }
   }
   if (state === 'intro') {
@@ -1279,16 +1197,10 @@ $('abandonSeason').onclick = () => {
   saveGp();
   refreshResumeCard();
 };
-for (const b of document.querySelectorAll('.mode')) b.onclick = () => setMode(b.dataset.mode);
-$('share').onclick = async () => {
-  try {
-    if (navigator.share) await navigator.share({ text: shareText });
-    else {
-      await navigator.clipboard.writeText(shareText);
-      toast('התוצאה הועתקה');
-    }
-  } catch {}
-};
+$('single').onclick = () => showTrackSheet(true);
+$('prevDriver').onclick = () => choose((selected + PARTIES.length - 1) % PARTIES.length);
+$('nextDriver').onclick = () => choose((selected + 1) % PARTIES.length);
+$('trackBack').onclick = () => showTrackSheet(false);
 arena.addEventListener('pointerdown', () => state === 'intro' && beginCountdown());
 // Touch driving: a quick tap in the steering zone fires the item; touching at "1" is a launch.
 const touchCtl = makeTouchControls({
@@ -1366,6 +1278,8 @@ addEventListener('keydown', e => {
   if ($('info').open || e.target instanceof HTMLInputElement) return;
   if (state === 'intro') return beginCountdown();
   if (state === 'home' && e.code === 'Enter' && document.activeElement === document.body) return play();
+  if (state === 'home' && e.code === 'Escape' && !$('trackSheet').classList.contains('hidden'))
+    return showTrackSheet(false);
   if (
     !['running', 'countdown', 'paused'].includes(state) ||
     (!KEY_ACTIONS[e.code] && !commandCodes.has(e.code))
@@ -1442,7 +1356,9 @@ setMode(mode);
 refreshResumeCard();
 document.title = `${level.name} — קואליציה קארט`;
 setCamera(true);
-$('loading').classList.add('hidden');
+// The loading poster fills its bar, then lifts away to reveal the title screen.
+$('loading').classList.add('done');
+setTimeout(() => $('loading').classList.add('hidden'), reduced ? 0 : 900);
 $('play').disabled = false;
 requestAnimationFrame(frame);
 if (params.get('go') === '1') {

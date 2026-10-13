@@ -3,3 +3,6 @@ node_modules/
 *.tar.gz
 *.log
 test-results/
+.env
+.env.*
+!.env.example
