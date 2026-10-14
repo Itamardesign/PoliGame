@@ -106,6 +106,8 @@ test('an occupied item slot cannot be overwritten; all racers can use items', ()
 test('200cc rivals are faster than 150cc; vehicles differ but stay balanced', async () => {
   const a = makeRace(0, 'normal', 5),
     b = makeRace(0, 'hard', 5);
+  // Shield the player so a rival's item cannot make the two runs differ.
+  a.racers[0].shield = b.racers[0].shield = 99;
   for (let i = 0; i < 200; i++) {
     stepRace(a, 1 / 60, {});
     stepRace(b, 1 / 60, {});

@@ -151,6 +151,9 @@ export function rng(seed) {
 // rivals far behind get a little extra, rivals far ahead ease off.
 export const PACE = { normal: -1.6, hard: 0.2, insane: 1.7 };
 export const CATCH_UP = { normal: 1, hard: 0.8, insane: 0.6 };
+// Rivals are spread from the fastest (no penalty) to the slowest (this much slower), in even
+// steps dealt out at random, so the field strings out over several seconds instead of a bunch.
+export const PACE_SPREAD = 5.4;
 const BASE_SPEED = 32;
 const TIMERS = [
   'boost',
@@ -245,9 +248,16 @@ export function makeRace(
       abilityActive: 0,
       stats: STATS[id],
       skill: 0.985 + random() * 0.03,
+      pace: 0,
       brain: i === 0 ? null : makeBrain(id, random)
     }))
   };
+  const rivals = race.racers.slice(1);
+  for (let i = rivals.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [rivals[i], rivals[j]] = [rivals[j], rivals[i]];
+  }
+  rivals.forEach((r, i) => (r.pace = rivals.length > 1 ? (-PACE_SPREAD * i) / (rivals.length - 1) : 0));
   const slot = Math.min(race.handicap.gridSlot ?? 0, race.racers.length - 1);
   if (slot > 0) {
     // The player gives up pole: swap grid slots with the car on the slot the demand names.
@@ -518,12 +528,16 @@ export function stepRace(race, dt, input = {}, curve = 0) {
     let target = BASE_SPEED + stats.top + ballots * stats.ballot;
     if (control.accelerate && !control.brake) target += 3;
     if (!r.player) {
-      target += (PACE[race.difficulty] ?? PACE.normal) + (r.skill - 1) * 30;
+      target += (PACE[race.difficulty] ?? PACE.normal) + 0.45 + r.pace;
       if (lead.player && lead.finish === null) {
         const gap = r.s - lead.s,
           k = CATCH_UP[race.difficulty] ?? 1;
-        if (gap < -25) target += Math.min(3.2, ((-gap - 25) / 70) * 3.2) * k;
-        if (gap > 20) target -= Math.min(3, ((gap - 20) / 90) * 3) * k;
+        // Rivals behind push to catch up; the slowest on the ladder push least.
+        const push = 1 + (0.75 * r.pace) / PACE_SPREAD;
+        if (gap < -25) target += Math.min(3.2, ((-gap - 25) / 70) * 3.2) * k * push;
+        // Rivals ahead ease off, but faster ones keep a longer lead so the field stays strung out.
+        const reach = 20 + (r.pace + PACE_SPREAD) * 18;
+        if (gap > reach) target -= Math.min(3, ((gap - reach) / 90) * 3) * k;
       }
     }
     if (r.boost > 0) target += 13;
